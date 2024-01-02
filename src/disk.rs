@@ -1,5 +1,5 @@
 use std::fs::{File, OpenOptions};
-use std::io::{Write, Seek, Read, SeekFrom, Result};
+use std::io::{self, Write, Seek, Read, SeekFrom, Result};
 use std::mem;
 
 use crate::types::{Header, NodeBlock, Node, Relationship, Attribute, BlockType};
@@ -17,31 +17,22 @@ pub fn format_disk(record_no: usize) -> Result<()>{
     let mut stream = File::create(PATH)?;
     let db_size = mem::size_of::<Header>() + (mem::size_of::<NodeBlock>() * record_no);
 
-    let mut block = NodeBlock {
-        block_type: BlockType::Empty,
-        node: {
-            Node {
-                id: 0,
-                name: "".to_string(),
-                rlt_head: 0,
-                attr_head: 0,
-            }},
-    };
+    let mut block: NodeBlock = Default::default();
 
     let mut header = Header {
-        total_blocks: record_no.try_into().unwrap(),
-        first_empty: mem::size_of::<Header>().try_into().unwrap(),
+        total_blocks: record_no.try_into().unwrap(),                // implement correctly (remove unwrap),
+        first_empty: mem::size_of::<Header>().try_into().unwrap(),  // or create a DEFAULT...
         db_size: db_size.try_into().unwrap(),
     };
 
-    // let serialized_header = bincode::serialize(&header).unwrap();
-    // let serialized_block = bincode::serialize(&block).unwrap();
+    println!("Header: {:?}\r", header);
 
     // write header to file:
-
     stream.write_all(raw_bytes_mut(&mut header))?;
-    // stream.write_all(&serialized_header)?;
     
+    // seek to first empty'
+    stream.seek(SeekFrom::Start(header.first_empty))?;
+
     for _ in 0..record_no {
         stream.write_all(raw_bytes_mut(&mut block))?;
         // stream.write_all(&serialized_block)?;
@@ -60,7 +51,8 @@ pub fn print_header() -> Result<()>{
     let mut header: Header = Default::default();
 
     // read and print header
-    let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<Header>());
+    // let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<Header>());
+    let mut buffer: Vec<u8> = vec![0; 24];
     stream.read_to_end(&mut buffer)?;
 
     let result = bincode::deserialize(&buffer);
@@ -87,22 +79,23 @@ pub fn print_header() -> Result<()>{
 //  Print any generic block given offset.
 pub fn print_block(offset: u64) -> Result<()>{
     let mut stream = File::open(PATH)?;
+    let mut block = Default::default();
 
     // Move to offset
     println!("Seeking -> Offset: {}\r", offset);
     let n = stream.seek(SeekFrom::Start(offset));
 
     // Read bytes into Block struct
-    let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<NodeBlock>());
-    // let mut buffer: Vec<u8> = vec![0; 56];
+    // let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<NodeBlock>());
+    let mut buffer: Vec<u8> = vec![0; 56];
     stream.read_to_end(&mut buffer)?;
 
     // Decode bytes into Block struct
     let result = bincode::deserialize::<NodeBlock>(&buffer);
 
     if result.is_ok(){
-        let header = result.unwrap();
-        println!("Block Info: {:?}\r", header);
+        block = result.unwrap();
+        println!("Block Info: {:?}\r", block);
     }
     else{
         println!("in reading header... Error: {:?}", result);
@@ -328,16 +321,22 @@ pub fn create_node(new_node: Node) -> Result<()> {
 
     // update first empty
     let new_first_empty = get_first_empty(&stream);
-    println!("New First Empty: {}\r", new_first_empty);
-    header.first_empty = new_first_empty;
-    // header.total_blocks += 1;
+    if new_first_empty == 0{
+        // TODO: handle erroneous or even full DB...
+        println!("Panic!");
+        Ok(())
+    }
+    else{
+        println!("New First Empty: {}\r", new_first_empty);
+        header.first_empty = new_first_empty;
 
-    // write header
-    stream.seek(SeekFrom::Start(0)).expect("TODO: panic message");
-    stream.write_all(raw_bytes_mut(&mut header))?;
+        // write header
+        stream.seek(SeekFrom::Start(0)).expect("TODO: panic message");
+        stream.write_all(raw_bytes_mut(&mut header))?;
 
-    println!(" - Create Node successful...\r\n");
-    Ok(())
+        println!(" - Create Node successful...\r\n");
+        Ok(())
+    }
 }
 
 pub fn test_nodes() -> (){

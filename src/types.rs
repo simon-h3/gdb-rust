@@ -1,5 +1,5 @@
 // Define the structs used in the database
-pub const PATH: &str = "test_database.db";
+pub const PATH: &str = "database/test_database.db";
 
 use std::mem;
 
@@ -62,7 +62,7 @@ impl Default for NodeBlock {
             node: {
                 Node {
                     id: 0,
-                    name: "".to_string(),
+                    name: ".".to_string(),
                     rlt_head: 0,
                     attr_head: 0,
                 }
