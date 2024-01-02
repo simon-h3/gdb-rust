@@ -1,23 +1,8 @@
-use std::fs::File;
-use std::io::Write;
-use std::io::Read;
-use std::io::Seek;
-use std::io::SeekFrom;
-use std::fs::OpenOptions;
-use std::io::Result;
-// use close_file::Closable;
+use std::fs::{File, OpenOptions};
+use std::io::{Write, Seek, Read, SeekFrom, Result};
 use std::mem;
 
-
-
-
-use crate::types::Header;
-use crate::types::NodeBlock;
-use crate::types::Node;
-use crate::types::Relationship;
-use crate::types::Attribute;
-use crate::types::BlockType;
-
+use crate::types::{Header, NodeBlock, Node, Relationship, Attribute, BlockType};
 use crate::types::PATH;
 
 // Helper function to get a mutable reference to a slice
@@ -29,11 +14,10 @@ fn raw_bytes_mut<T>(data: &mut T) -> &mut [u8] {
 
 // Format files used in DB - create header and empty blocks
 pub fn format_disk(record_no: usize) -> Result<()>{
-
     let mut stream = File::create(PATH)?;
     let db_size = mem::size_of::<Header>() + (mem::size_of::<NodeBlock>() * record_no);
 
-    let block = NodeBlock {
+    let mut block = NodeBlock {
         block_type: BlockType::Empty,
         node: {
             Node {
@@ -44,29 +28,30 @@ pub fn format_disk(record_no: usize) -> Result<()>{
             }},
     };
 
-    let header = Header {
+    let mut header = Header {
         total_blocks: record_no.try_into().unwrap(),
         first_empty: mem::size_of::<Header>().try_into().unwrap(),
         db_size: db_size.try_into().unwrap(),
     };
 
-    let serialized_header = bincode::serialize(&header).unwrap();
-    let serialized_block = bincode::serialize(&block).unwrap();
+    // let serialized_header = bincode::serialize(&header).unwrap();
+    // let serialized_block = bincode::serialize(&block).unwrap();
 
-    stream.write_all(&serialized_header)?;
+    // write header to file:
+
+    stream.write_all(raw_bytes_mut(&mut header))?;
+    // stream.write_all(&serialized_header)?;
     
     for _ in 0..record_no {
-        stream.write_all(&serialized_block)?;
+        stream.write_all(raw_bytes_mut(&mut block))?;
+        // stream.write_all(&serialized_block)?;
     }
 
     println!(" - Format {} successful...\r", PATH);
     Ok(())
 }
 
-// /// Grow output file when total blocks > blocks available, implemented to dynamically scale Database files.
-// /// \param outfile
-// /// \param newRecordNo
-// /// \return
+//  Grow output file when total blocks > blocks available, implemented to dynamically scale Database files.
 // fn bool expandFile(const char* outfile, int newRecordNo);
 
 // Print header of file, given file name.
@@ -74,76 +59,60 @@ pub fn print_header() -> Result<()>{
     let mut stream = File::open(PATH)?;
     let mut header: Header = Default::default();
 
-    // deserialize
+    // read and print header
     let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<Header>());
     stream.read_to_end(&mut buffer)?;
+
     let result = bincode::deserialize(&buffer);
+
     if result.is_ok(){
         header = result.unwrap();
-        println!("Header: \r");
-        println!("Total Blocks: {}\r", header.total_blocks);
-        println!("First Free Block: {}\r", header.first_empty);
-        println!("DB Size: {}\r", header.db_size);
-        println!("----------------------\r"); 
-        Ok(())
+        println!("Header: {:?}\r", header);
     }
     else{
-        println!("In Printing header... Error: {:?}", result);
-        Ok(())
+        println!("in reading header... Error: {:?}", result);
     }
+    Ok(())
 }
 
-// /// Shortcut header printer (of all files)
+//  Shortcut header printer (of all files)
 // fn printHeaders();
 
-// /// Given an offset print node to console.
-// /// \param offset of node to be printed
-// fn printNodeName(fn u64 offset);
+//  Given an offset print node to console.
+// fn printNodeName(fn offset: u64);
 
 // Print attributes of a Relationship given a relationship
-// fn printRelationship(Relationship relationship);
+// fn printRelationship(relationship: Relationship);
 
-// /// Print any generic block given offset.
-// /// \param filename
-// /// \param offset
-pub fn print_block(offset: u64) -> Result<()> {
+//  Print any generic block given offset.
+pub fn print_block(offset: u64) -> Result<()>{
     let mut stream = File::open(PATH)?;
 
     // Move to offset
     println!("Seeking -> Offset: {}\r", offset);
-    stream.seek(SeekFrom::Start(offset))?;
+    let n = stream.seek(SeekFrom::Start(offset));
 
     // Read bytes into Block struct
-
     let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<NodeBlock>());
+    // let mut buffer: Vec<u8> = vec![0; 56];
     stream.read_to_end(&mut buffer)?;
 
     // Decode bytes into Block struct
-    let result = bincode::deserialize(&buffer);
+    let result = bincode::deserialize::<NodeBlock>(&buffer);
 
     if result.is_ok(){
-        let decoded_block: NodeBlock = result.unwrap();
-        match decoded_block.block_type {
-            BlockType::Empty => println!("BlockType is Empty\r"),
-            BlockType::Unset => println!("BlockType is Unset\r"),
-            BlockType::Node => {
-                // Cast reserved portion of Block into Node
-                let node: Node = decoded_block.node;
-                println!("BlockType is Node: {:?}\r", node);
-            }
-            BlockType::Relationship => println!("BlockType is Relationship\r"),
-            BlockType::Attribute => println!("BlockType is Attribute\r"),
-        }
+        let header = result.unwrap();
+        println!("Block Info: {:?}\r", header);
     }
     else{
-        println!("PrintBlock Error: {:?}", result);
+        println!("in reading header... Error: {:?}", result);
     }
 
     Ok(())
 }
 
-// /// Get header from file and return
-pub fn get_first_empty() -> Result<u64> {
+//  Get header from file and return
+/*pub fn get_first_empty() -> Result<u64> {
     let mut stream = File::open(PATH)?;
     let mut header: Header = Default::default();
     let mut block: NodeBlock = Default::default();
@@ -155,7 +124,7 @@ pub fn get_first_empty() -> Result<u64> {
     let mut buffer: Vec<u8> = Vec::with_capacity(header_size.try_into().unwrap());
     stream.read_to_end(&mut buffer)?;
     let result = bincode::deserialize(&buffer);
-    
+
     if result.is_ok(){
         header = result.unwrap();
         println!("Header: {:?}\r", header);
@@ -182,7 +151,7 @@ pub fn get_first_empty() -> Result<u64> {
         // Decode bytes into Block struct
         let result2 = bincode::deserialize::<NodeBlock>(&buffer);
         println!("Result2: {:?}\r", result2);
-        
+
         match result2 {
             Ok(decoded_block) => {
                 block = decoded_block;
@@ -200,19 +169,85 @@ pub fn get_first_empty() -> Result<u64> {
         }
     }
     Ok(curr_offset)
+}*/
+
+fn get_first_empty(mut stream: &File) -> u64 {
+    let mut buffer: Vec<u8> = vec![0; mem::size_of::<Header>()];
+
+    stream.read_to_end(&mut buffer).expect("TODO: panic message");  // read header
+    let result = bincode::deserialize::<Header>(&buffer);           // decode header
+
+    match result {
+        Ok(header) => {
+            let struct_size = mem::size_of::<NodeBlock>() as u64;
+            let mut curr_offset = mem::size_of::<Header>() as u64;
+            
+            stream.seek(SeekFrom::Start(mem::size_of::<Header>() as u64)).unwrap(); // move to first block
+
+            for _ in 0..header.total_blocks {
+                // Read bytes into Block struct
+                let mut buffer: Vec<u8> = vec![0; mem::size_of::<NodeBlock>()];
+                stream.read_to_end(&mut buffer).expect("TODO: panic message");
+
+                // Decode bytes into Block struct
+                let result = bincode::deserialize::<NodeBlock>(&buffer);
+
+                match result {
+                    Ok(block) => {
+                        println!("BlockNode: {:?}\r", block);
+
+                        if block.block_type == BlockType::Empty {
+                            return curr_offset - mem::size_of::<NodeBlock>() as u64;
+                        }
+                        curr_offset += struct_size;
+                    }
+                    Err(e) => {
+                        println!("Erroneous NodeBlock result: {:?}", e);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            println!("Error: {:?}", e); // TODO: panic message
+        }
+    }
+
+    // if result.is_ok(){
+    //     let header = result.unwrap();
+    //     println!("Header: {:?}\r", header);
+
+    //     for _ in 0..header.total_blocks {
+    //         // Read bytes into Block struct
+    //         let mut buffer: Vec<u8> = vec![0; mem::size_of::<NodeBlock>()];
+    //         stream.read_to_end(&mut buffer).expect("TODO: panic message");
+
+    //         // Decode bytes into Block struct
+    //         let result = bincode::deserialize::<NodeBlock>(&buffer);
+
+    //         if result.is_ok(){
+    //             let block = result.unwrap();
+    //             println!("BlockNode: {:?}\r", block);
+
+    //             if block.block_type == BlockType::Empty {
+    //                 return stream.seek(SeekFrom::Current(0)).unwrap() - mem::size_of::<NodeBlock>() as u64;
+    //             }
+    //         }
+    //     }
+    // }
+    // else{
+    //     println!("in reading header... Error: {:?}", result);
+    // }
+    return 0;
 }
 
 // Debug function
 pub fn print_first_empty() -> Result<()> {
-    let _stream = File::open(PATH)?;
-    println!("First Empty: {}", get_first_empty()?);
+    let stream = File::open(PATH)?;
+    println!("First Empty: {}", get_first_empty(&stream));
     Ok(())
 }
 
-// /// fn boolean comparison between two Node structs
-// /// \param node1
-// /// \param node2
-// /// \return
+//  fn boolean comparison between two Node structs
 pub fn compare_node(node1: &Node, node2: &Node) -> bool {
     if node1.id == node2.id {
         return true;
@@ -220,10 +255,7 @@ pub fn compare_node(node1: &Node, node2: &Node) -> bool {
     false
 }
 
-// /// fn boolean comparison between two Relationship structs
-// /// \param rlt1
-// /// \param rlt2
-// /// \return
+//  fn boolean comparison between two Relationship structs
 pub fn compare_relationship(rlt1: &Relationship, rlt2: &Relationship) -> bool {
     if rlt1.node_from == rlt2.node_from && rlt1.node_to == rlt2.node_to {
         return true;
@@ -238,7 +270,7 @@ pub fn compareAttribute(attrib1: &Attribute, attrib2: &Attribute) -> bool {
     return false;
 }
 
-// /// Given offset, return node structure
+//  Given offset, return node structure
 pub fn get_node(offset: &usize) -> Result<Node> {
     let mut node: Node = Default::default();
     let mut stream = File::open(PATH)?;
@@ -249,55 +281,60 @@ pub fn get_node(offset: &usize) -> Result<Node> {
     // Read the block from the stream
     let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<NodeBlock>());
     stream.read_to_end(&mut buffer)?;
-    let result = bincode::deserialize(&buffer);
-    if result.is_ok(){
-        let block: NodeBlock = result.unwrap();
-        node = block.node;
-        return Ok(node)
-    }
-    else{
-        println!("In get-node Error: {:?}", result);
-    }
+
+
+    // let result = bincode::deserialize(&buffer);
+    
+    // if result.is_ok(){
+    //     let block: NodeBlock = result.unwrap();
+    //     node = block.node;
+    //     return Ok(node)
+    // }
+    // else{
+    //     println!("In get-node Error: {:?}", result);
+    // }
 
     Ok(node)
 }
 
-// /// Create Node and write it to disk
-// /// \return
+//  Create Node and write it to disk
 pub fn create_node(new_node: Node) -> Result<()> {
-    let mut stream = File::open(PATH)?;
+    // let mut stream = File::open(PATH)?;
+    let mut stream = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(PATH)?;
 
     let mut header: Header = Default::default();
-    let _block: NodeBlock = Default::default();
 
     // read header
-    let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<Header>());
-    stream.read(&mut buffer)?;
+    // let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<Header>());
+    let mut buffer: Vec<u8> = vec![0; 24];
+    stream.read_to_end(&mut buffer).expect("TODO: panic message");
 
-    let mut stream = File::create(PATH)?;
+    // let mut stream = File::create(PATH)?;
 
     // go to first empty
-    stream.seek(SeekFrom::Start(header.first_empty))?;  // test this
+    stream.seek(SeekFrom::Start(header.first_empty))?;
 
-    let node_block = NodeBlock {
+    let mut node_block = NodeBlock {
         block_type: BlockType::Node,
         node: new_node,
     };
 
     // write node information
-    let serialised_node_block = bincode::serialize(&node_block);
-    stream.write_all(&serialised_node_block.unwrap())?;
+    stream.write_all(raw_bytes_mut(&mut node_block))?;
 
     // update first empty
-    let new_first_empty = get_first_empty()?;
+    let new_first_empty = get_first_empty(&stream);
     println!("New First Empty: {}\r", new_first_empty);
     header.first_empty = new_first_empty;
     // header.total_blocks += 1;
 
     // write header
-    let serialised_header = bincode::serialize(&header);
-    stream.seek(SeekFrom::Start(0))?;
-    stream.write_all(&serialised_header.unwrap())?;
+    stream.seek(SeekFrom::Start(0)).expect("TODO: panic message");
+    stream.write_all(raw_bytes_mut(&mut header))?;
 
     println!(" - Create Node successful...\r\n");
     Ok(())
@@ -335,128 +372,75 @@ pub fn test_nodes() -> (){
     // println!("3: {:?}", c);
 }
 
-// /// Given id, return node Address
-// /// \param nodeName
-// /// \param id
-// /// \return
+//  Given id, return node Address
 // fn u64 getNodeFromID(int id);
 
-// /// Returns node address given node name
-// /// \param nodeName
-// /// \return
+//  Returns node address given node name
 // fn u64 getNodeAddressFromName(char* nodeName);
 
-// /// Basic Find node function
-// /// \param node
-// /// \return
+//  Basic Find node function
 // fn u64 getNodeAddress(Node* node);
 
-// /// Returns relationships address given a relationship
-// /// \param relationship
-// /// \return
+//  Returns relationships address given a relationship
 // fn u64 getRelationshipAddress(Relationship relationship);
 
-// /// Returns attributes address given an attribute
-// /// \param nameFrom
-// /// \param nameTo
-// /// \return
+//  Returns attributes address given an attribute
 // Relationship getRelationshipToFrom(char* nameFrom, char* nameTo);
 
-// /// Returns attributes address given an attributes content
-// /// \param content
-// /// \return
+//  Returns attributes address given an attributes content
+
 // fn u64 getAttributeAddressContent(char* content);
 
-// /// Returns attributes address given an attribute
-// /// \param attribute
-// /// \return
+//  Returns attributes address given an attribute
+
 // fn u64 getAttributeAddress(Attribute attribute);
 
-// /// Traverse file and print each block
-// /// \param filename
+//  Traverse file and print each block
 // fn printAllNodes(const char* filename);
 
-// /// Print all relations FROM a node.
-// /// \param nodeOffset
+//  Print all relations FROM a node.
 // fn printFromRelations(fn u64 nodeOffset);
 
-// /// Print all relations TO a node.
-// /// \param nodeOffset
+//  Print all relations TO a node.
 // fn printToRelations(fn u64 nodeOffset);
 
-// /// Print all attributes of a node.
-// /// \param nodeOffset
+//  Print all attributes of a node.
 // fn printAttributes(fn u64 nodeOffset);
 
-// /// If the relationships exists, extract data and write to file
-// /// \param filename
-// /// \param relationship
-// /// \return
+//  If the relationships exists, extract data and write to file
 // fn bool writeRelationship(const char* filename, Relationship relationship);
 
-// /// Create Relationship and write to disk
-// /// \param filename
-// /// \param nodeFrom
-// /// \param nodeTo
-// /// \return
+//  Create Relationship and write to disk
 // fn bool createRelationship(const char* filename, fn u64 nodeFrom, fn u64 nodeTo);
 
-// /// Create Attribute and write it to disk
-// /// \param filename
-// /// \param attrib
-// /// \return
+//  Create Attribute and write it to disk
 // fn bool createAttribute(const char* filename, char* attrib);
 
-// ///
-// /// \param node
-// /// \param newNodeName
-// /// \return
 // fn bool updateNodeName(fn u64 node, char* newNodeName);
 
-// /// Retrospectively update nodes relationship list head upon creation, if already set follow and set to tail of list.
-// /// \param nodeAddress
-// /// \param rltHead
-// /// \return
+//  Retrospectively update nodes relationship list head upon creation, if already set follow and set to tail of list.
 // fn bool updateNodeRlt(fn u64 nodeAddress, fn u64 rltHead);
 
-// /// Retrospectively update nodes attribute list head upon creation, if already set follow and set to tail of list.
-// /// \param nodeAddress
-// /// \param attribOffset
-// /// \return
+//  Retrospectively update nodes attribute list head upon creation, if already set follow and set to tail of list.
 // fn bool updateNodeAttribute(fn u64 nodeAddress, fn u64 attribOffset);
 
-// /// Assigns relationshipBlock to EMPTY_BLOCK and writes to disk
-// /// \param relationship
-// /// \return
+//  Assigns relationshipBlock to EMPTY_BLOCK and writes to disk
 // fn bool deleteRelationship(Relationship relationship);
 
-// /// Given a relationship remove its record
-// /// \param relationship
-// /// \return
+//  Given a relationship remove its record
 // fn bool deleteRelationshipRecouple(Relationship relationship, fn u64 nodeRltOffset);
 
-// /// Given an attribute remove its record
-// /// \param attribute
-// /// \return
+//  Given an attribute remove its record
 // fn bool deleteAttribute(Attribute attribute);
 
-// /// Given a nodes name remove its record
-// /// \param name
-// /// \return
+//  Given a nodes name remove its record
 // fn bool deleteNodeName(char* name);
 
-// /// Given a Node remove its record
-// /// \param node
-// /// \return
+//  Given a Node remove its record
 // fn bool deleteNode(Node node);
 
-// /// Given an offset and file, remove corresponding record
-// /// \param filename
-// /// \param offset
-// /// \return
+//  Given an offset and file, remove corresponding record
 // fn bool deleteRecordOffset(const char* filename, fn u64 offset);
 
-// /// Export GDB for visualisation with Python
-// /// \param outfile
-// /// \return
+//  Export GDB for visualisation with Python
 // fn bool exportGraphDatabase();

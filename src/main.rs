@@ -24,7 +24,9 @@ fn db_test(){
 
     disk::test_nodes();
 
-    // disk::print_first_empty();
+    disk::print_block(24);
+
+    disk::print_first_empty();
 
     disk::print_header();
 
