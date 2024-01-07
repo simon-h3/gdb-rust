@@ -1,6 +1,6 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write, Seek, Read, SeekFrom, Result};
-use std::mem;
+use std::mem::size_of;
 
 use crate::types::{Header, NodeBlock, Node, Relationship, Attribute, BlockType};
 use crate::types::PATH;
@@ -8,7 +8,7 @@ use crate::types::PATH;
 // Helper function to get a mutable reference to a slice
 // fn raw_bytes_mut<T>(data: &mut T) -> &mut [u8] {
 //     unsafe {
-//         std::slice::from_raw_parts_mut(data as *mut T as *mut u8, mem::size_of_val(data))
+//         std::slice::from_raw_parts_mut(data as *mut T as *mut u8, size_of_val(data))
 //     }
 // }
 
@@ -22,13 +22,13 @@ macro_rules! custom_error {
 // Format files used in DB - create header and empty blocks
 pub fn format_disk(record_no: usize) -> Result<()>{
     let mut stream = File::create(PATH)?;
-    let db_size = mem::size_of::<Header>() + (mem::size_of::<NodeBlock>() * record_no);
+    let db_size = size_of::<Header>() + (size_of::<NodeBlock>() * record_no);
 
     let block: NodeBlock = Default::default();
 
     let mut header = Header {
         total_blocks: record_no.try_into().unwrap(),                // implement correctly (remove unwrap),
-        first_empty: mem::size_of::<Header>().try_into().unwrap(),  // or create a DEFAULT...
+        first_empty: size_of::<Header>().try_into().unwrap(),  // or create a DEFAULT...
         db_size: db_size.try_into().unwrap(),
     };
 
@@ -67,7 +67,7 @@ pub fn print_header() -> Result<()>{
     // let mut stream = File::open(PATH)?;   // should be open(PATH)...
     let mut stream = OpenOptions::new().read(true).open(PATH)?;
     // read and print header
-    let mut buffer: Vec<u8> = Vec::with_capacity(mem::size_of::<Header>());
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
     // let mut buffer: Vec<u8> = vec![0; 24];
     let read_result = stream.read_to_end(&mut buffer);
 
@@ -113,7 +113,7 @@ pub fn print_block(offset: u64) -> Result<()>{
     stream.seek(SeekFrom::Start(offset))?;
 
     // Read bytes into Block struct
-    let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<NodeBlock>());
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
     // let mut buffer: Vec<u8> = vec![0; 56];
     stream.read_to_end(&mut buffer)?;
 
@@ -132,117 +132,50 @@ pub fn print_block(offset: u64) -> Result<()>{
     Ok(())
 }
 
-//  Get header from file and return
-/*pub fn get_first_empty() -> Result<u64> {
-    let mut stream = File::open(PATH)?;
-    let mut header: Header = Default::default();
-    let mut block: NodeBlock = Default::default();
+fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
+    // let mut buffer: Vec<u8> = vec![0; size_of::<Header>()];
 
-    stream.seek(SeekFrom::Start(0))?;
+    // stream.read_to_end(&mut buffer)?; // read header
+    // let result = bincode::deserialize::<Header>(&buffer); // decode header
 
-    // Read the header from the stream
-    let header_size = std::mem::size_of::<Header>();
-    let mut buffer: Vec<u8> = Vec::with_capacity(header_size.try_into().unwrap());
-    stream.read_to_end(&mut buffer)?;
-    let result = bincode::deserialize(&buffer);
+    let struct_size = size_of::<NodeBlock>() as u64;
+    let mut curr_offset = size_of::<Header>() as u64;
 
-    if result.is_ok(){
-        header = result.unwrap();
-        println!("Header: {:?}\r", header);
-    }
-    else{
-        println!("in reading header... Error: {:?}", result);
-    }
+    stream.seek(SeekFrom::Start(curr_offset)).unwrap(); // move to first block
 
-    let mut stream = File::open(PATH)?;
-
-    let struct_size = mem::size_of::<NodeBlock>() as u64;
-    let mut curr_offset = 0;
-
-    for offset in 0..header.total_blocks{
-        // Move to offset
-        curr_offset = header_size as u64 + (offset * struct_size) as u64;
-        println!("Seeking -> Offset: {}\r", curr_offset);
-        let n = stream.seek(SeekFrom::Start(curr_offset as u64))?;
-        println!("Seeked Amount -> Offset: {}\r", n);
+    for _ in 0..header.total_blocks {
         // Read bytes into Block struct
-        let mut buffer2: Vec<u8> = Vec::with_capacity(struct_size.try_into().unwrap());
-        stream.read_exact(&mut buffer2)?;
+        let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
+        stream.read_to_end(&mut buffer)?;   // TODO: find alternative to read_to_end...
 
         // Decode bytes into Block struct
-        let result2 = bincode::deserialize::<NodeBlock>(&buffer);
-        println!("Result2: {:?}\r", result2);
+        let result = bincode::deserialize::<NodeBlock>(&buffer);
 
-        match result2 {
-            Ok(decoded_block) => {
-                block = decoded_block;
-                println!("BlockNode: {:?}\r", block);
+        match result {
+            Ok(block) => {
+                // println!("BlockNode: {:?}\r", block);
+
+                if block.block_type == BlockType::Empty || block.block_type == BlockType::Unset {
+                    // return current offset - sizeofBlock
+                    return Ok(stream.seek(SeekFrom::Current(0))? - struct_size);
+                }
+                // move to next block
+                curr_offset += struct_size;
+                stream.seek(SeekFrom::Start(curr_offset))?;
             }
             Err(e) => {
-                println!("Error: {:?}", e);
-            }
-            // block = result2.unwrap();
-            // println!("BlockNode: {:?}\r", block);
-
-            // if block.block_type == BlockType::Empty {
-            //     break;
-            // }
-        }
-    }
-    Ok(curr_offset)
-}*/
-
-fn get_first_empty(mut stream: &File) -> Result<u64> {
-    let mut buffer: Vec<u8> = vec![0; mem::size_of::<Header>()];
-
-    stream.read_to_end(&mut buffer)?; // read header
-    let result = bincode::deserialize::<Header>(&buffer); // decode header
-
-    match result {
-        Ok(header) => {
-            let struct_size = mem::size_of::<NodeBlock>() as u64;
-            let mut curr_offset = mem::size_of::<Header>() as u64;
-            
-            stream.seek(SeekFrom::Start(curr_offset)).unwrap(); // move to first block
-
-            for _ in 0..header.total_blocks {
-                // Read bytes into Block struct
-                let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<NodeBlock>());
-                stream.read_to_end(&mut buffer)?;   // TODO: find alternatve to read_to_end...
-
-                // Decode bytes into Block struct
-                let result = bincode::deserialize::<NodeBlock>(&buffer);
-
-                match result {
-                    Ok(block) => {
-                        println!("BlockNode: {:?}\r", block);
-
-                        if block.block_type == BlockType::Empty || block.block_type == BlockType::Unset {
-                            // return current offset - sizeofBlock
-                            return Ok(stream.seek(SeekFrom::Current(0))? - struct_size);
-                        }
-                        // move to next block
-                        curr_offset += struct_size;
-                        stream.seek(SeekFrom::Start(curr_offset))?;
-                    }
-                    Err(e) => {
-                        println!("Erroneous NodeBlock result: {:?}", e);
-                    }
-                }
+                // println!("Erroneous NodeBlock result: {:?}", e);
+                // continue... could still return
             }
         }
-        Err(e) => {
-            println!("Err when de-serialising Header in get_first_empty: {:?}", e); // TODO: panic message
-        }
     }
-
-    return custom_error!("No empty blocks found");
+    return custom_error!("Error in getting first empty");   // header doesn't match file or header not read correctly
 }
 
 // Debug function
 pub fn print_first_empty() -> Result<()> {
     let stream = File::open(PATH)?;
-    println!("First Empty: {}", get_first_empty(&stream)?);
+    // println!("First Empty: {}", get_first_empty(&stream)?);
     Ok(())
 }
 
@@ -262,7 +195,7 @@ pub fn compare_relationship(rlt1: &Relationship, rlt2: &Relationship) -> bool {
     false
 }
 
-pub fn compareAttribute(attrib1: &Attribute, attrib2: &Attribute) -> bool {
+pub fn compare_attribute(attrib1: &Attribute, attrib2: &Attribute) -> bool {
     if attrib1.value == attrib2.value {
         return true;
     }
@@ -271,14 +204,14 @@ pub fn compareAttribute(attrib1: &Attribute, attrib2: &Attribute) -> bool {
 
 //  Given offset, return node structure
 pub fn get_node(offset: &usize) -> Result<Node> {
-    let mut node: Node = Default::default();
+    let node: Node = Default::default();
     let mut stream = File::open(PATH)?;
 
     // Rewind the stream to the beginning
     stream.seek(SeekFrom::Start(*offset as u64))?;
 
     // Read the block from the stream
-    let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<NodeBlock>());
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
     stream.read_to_end(&mut buffer)?;
 
 
@@ -303,7 +236,7 @@ pub fn create_node(new_node: Node) -> Result<()> {
 
     // read header
     let mut header;
-    let mut buffer: Vec<u8> = Vec::with_capacity(std::mem::size_of::<Header>());
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
     stream.read_to_end(&mut buffer)?;
     let mut header_result = bincode::deserialize::<Header>(&buffer);
 
@@ -314,6 +247,7 @@ pub fn create_node(new_node: Node) -> Result<()> {
         Err(e) => {
             // e incompatible with Result<()>...
             // return early
+            println!("{}", e);
             return custom_error!("Error in reading header");
         }
     }
@@ -321,7 +255,7 @@ pub fn create_node(new_node: Node) -> Result<()> {
     // go to first empty
     stream.seek(SeekFrom::Start(header.first_empty))?;
 
-    let mut node_block = NodeBlock {
+    let node_block = NodeBlock {
         block_type: BlockType::Node,
         node: new_node,
     };
@@ -335,13 +269,15 @@ pub fn create_node(new_node: Node) -> Result<()> {
         }
         Err(e) => {
             // e incompatible with Result<()>...
+            println!("{}", e);
             return custom_error!("Error in serializing node block");
         }
     }
 
     // update first empty
-    let new_first_empty = get_first_empty(&stream);
+    let new_first_empty = get_first_empty(&stream, &header);
 
+    // update header TODO: test functionality
     match new_first_empty {
         Ok(offset) => {
             if offset == 0{
@@ -363,6 +299,7 @@ pub fn create_node(new_node: Node) -> Result<()> {
                     }
                     Err(e) => {
                         // e incompatible with Result<()>...
+                        println!("{}", e);
                         return custom_error!("Error in serializing header");
                     }
                 }
