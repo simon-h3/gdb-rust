@@ -1,6 +1,7 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write, Seek, Read, SeekFrom, Result};
 use std::mem::size_of;
+use std::os::unix::fs::FileExt;
 
 use crate::types::{Header, NodeBlock, Node, Relationship, Attribute, BlockType};
 use crate::types::PATH;
@@ -22,12 +23,13 @@ macro_rules! custom_error {
 // Format files used in DB - create header and empty blocks
 pub fn format_disk(record_no: usize) -> Result<()>{
     let mut stream = File::create(PATH)?;
-    let db_size = size_of::<Header>() + (size_of::<NodeBlock>() * record_no);
+    let node_block_size = size_of::<NodeBlock>();
+    let db_size = size_of::<Header>() + (node_block_size * record_no);
 
     let block: NodeBlock = Default::default();
 
     let mut header = Header {
-        total_blocks: record_no.try_into().unwrap(),                // implement correctly (remove unwrap),
+        total_blocks: record_no.try_into().unwrap(),                // TODO: implement correctly (remove unwrap),
         first_empty: size_of::<Header>().try_into().unwrap(),  // or create a DEFAULT...
         db_size: db_size.try_into().unwrap(),
     };
@@ -45,11 +47,13 @@ pub fn format_disk(record_no: usize) -> Result<()>{
         // seek to first empty'
         stream.seek(SeekFrom::Start(header.first_empty))?;
 
+        let mut offset = header.first_empty;
         // write empty blocks to file:
         // loop in increments of block size
         for _ in 0..record_no {
             serialized_block = bincode::serialize(&block);
-            stream.write_all(&serialized_block.unwrap())?; // safe to unwrap as checked above
+            stream.write_at(&serialized_block.unwrap(), offset)?; // safe to unwrap as checked above
+            offset += node_block_size as u64;
         }
 
         println!(" - Format {} successful...\r", PATH);
@@ -132,6 +136,54 @@ pub fn print_block(offset: u64) -> Result<()>{
     Ok(())
 }
 
+//  Print all blocks in file.
+pub fn print_all_blocks() -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).open(PATH)?;
+    let mut curr_offset = size_of::<Header>() as u64;
+
+    // read header
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
+    let mut header_result = bincode::deserialize::<Header>(&buffer);
+
+    match header_result {
+        Ok(h) => {
+            stream.seek(SeekFrom::Start(curr_offset))?;
+
+            for _ in 0..h.total_blocks {
+                // Read bytes into Block struct
+                let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
+                stream.read_to_end(&mut buffer)?;
+
+                // Decode bytes into Block struct
+                let result = bincode::deserialize::<NodeBlock>(&buffer);
+
+                // move to next block (for next iteration)
+                curr_offset += size_of::<NodeBlock>() as u64;
+                stream.seek(SeekFrom::Start(curr_offset))?;
+
+                match result {
+                    Ok(block) => {
+                        println!("BlockNode: {:?}\r\n", block);
+                    }
+                    Err(e) => {
+                        println!("Erroneous NodeBlock result: {:?}\r\n", e);
+                        // continue... could still return
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            // e incompatible with Result<()>...
+            // return early
+            println!("{}", e);
+            return custom_error!("Error in reading header");
+        }
+    }
+
+    Ok(())
+}
+
 fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
     // let mut buffer: Vec<u8> = vec![0; size_of::<Header>()];
 
@@ -151,17 +203,15 @@ fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
         // Decode bytes into Block struct
         let result = bincode::deserialize::<NodeBlock>(&buffer);
 
+        // move to next block (for next iteration)
+        curr_offset += struct_size;
+        stream.seek(SeekFrom::Start(curr_offset))?;
+
         match result {
             Ok(block) => {
-                // println!("BlockNode: {:?}\r", block);
-
                 if block.block_type == BlockType::Empty || block.block_type == BlockType::Unset {
-                    // return current offset - sizeofBlock
-                    return Ok(stream.seek(SeekFrom::Current(0))? - struct_size);
+                    return Ok(curr_offset - struct_size);
                 }
-                // move to next block
-                curr_offset += struct_size;
-                stream.seek(SeekFrom::Start(curr_offset))?;
             }
             Err(e) => {
                 // println!("Erroneous NodeBlock result: {:?}", e);

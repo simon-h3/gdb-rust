@@ -12,25 +12,28 @@ const TITLE: &str = r#"
            \___/(__\_)\_/\_/(__)  \_)(_/  (____/\_/\_/(__)\_/\_/(____/\_/\_/(____/(____)
         "#;
 
-fn db_test(){
+fn db_test() {
     types::print_struct_info();
 
     println!("Format: {:?}", disk::format_disk(10));
     println!("Header: {:?}", disk::print_header());
 
-    println!("Block 1: {:?}", disk::print_block(24));
+    // println!("Block 1: {:?}", disk::print_block(24));
 
     // disk::print_first_empty();
 
     println!("Nodes: {:?}", disk::test_nodes());
 
-    println!("Block 2: {:?}", disk::print_block(24));
+    // println!("Block 2: {:?}", disk::print_block(24));
 
     // disk::print_first_empty();
 
-    println!("Header 2: {:?}", disk::print_header());
 
     // let n = disk::print_block(24);
+
+    disk::print_all_blocks();
+
+    println!("Header 2: {:?}", disk::print_header());
 }
 
 fn ncurses_menu(){
