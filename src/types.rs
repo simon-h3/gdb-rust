@@ -1,7 +1,8 @@
 // Define the structs used in the database
-pub const PATH: &str = "database/test_database.db";
+pub const PATH: &str = "test_database.db";
 
 use std::mem;
+use serde::ser::SerializeStruct;
 
 use serde_derive::{Serialize, Deserialize};
 
@@ -123,7 +124,6 @@ pub fn print_struct_info() {
     println!("Node Size:            {}\r", mem::size_of::<Node>());
     println!("Relationship Size:    {}\r", mem::size_of::<Relationship>());
     println!("Attribute Size:       {}\r", mem::size_of::<Attribute>());
-
     println!("String Size:          {}\r", mem::size_of::<String>());
     println!("----------------------");
 }
