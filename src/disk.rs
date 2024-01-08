@@ -3,20 +3,19 @@ use std::io::{self, Write, Seek, Read, SeekFrom, Result};
 use std::mem::size_of;
 use std::os::unix::fs::FileExt;
 
-use crate::types::{Header, NodeBlock, Node, Relationship, Attribute, BlockType};
+use crate::types::{Block, Header, NodeBlock, Node, Relationship, Attribute, BlockType, RelationshipBlock};
 use crate::types::PATH;
-
-// Helper function to get a mutable reference to a slice
-// fn raw_bytes_mut<T>(data: &mut T) -> &mut [u8] {
-//     unsafe {
-//         std::slice::from_raw_parts_mut(data as *mut T as *mut u8, size_of_val(data))
-//     }
-// }
 
 // custom error macro
 macro_rules! custom_error {
     ($msg:expr) => {
-        return Err(io::Error::new(io::ErrorKind::Other, $msg));
+        return Err(io::Error::new(io::ErrorKind::Other, $msg))
+    };
+}
+
+macro_rules! map_bincode_error {
+    ($expr:expr) => {
+        $expr.map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, format!("Bincode serialization error: {:?}", err)))
     };
 }
 
@@ -28,7 +27,7 @@ pub fn format_disk(record_no: usize) -> Result<()>{
 
     let block: NodeBlock = Default::default();
 
-    let mut header = Header {
+    let header = Header {
         total_blocks: record_no.try_into().unwrap(),                // TODO: implement correctly (remove unwrap),
         first_empty: size_of::<Header>().try_into().unwrap(),  // or create a DEFAULT...
         db_size: db_size.try_into().unwrap(),
@@ -144,7 +143,7 @@ pub fn print_all_blocks() -> Result<()>{
     // read header
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
     stream.read_to_end(&mut buffer)?;
-    let mut header_result = bincode::deserialize::<Header>(&buffer);
+    let header_result = bincode::deserialize::<Header>(&buffer);
 
     match header_result {
         Ok(h) => {
@@ -155,20 +154,29 @@ pub fn print_all_blocks() -> Result<()>{
                 let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
                 stream.read_to_end(&mut buffer)?;
 
-                // Decode bytes into Block struct
-                let result = bincode::deserialize::<NodeBlock>(&buffer);
-
+                // Decode bytes into Block struct TODO: generic block, recast into corresponding block type
+                let block = map_bincode_error!(bincode::deserialize::<Block>(&buffer))?;
                 // move to next block (for next iteration)
                 curr_offset += size_of::<NodeBlock>() as u64;
                 stream.seek(SeekFrom::Start(curr_offset))?;
 
-                match result {
-                    Ok(block) => {
-                        println!("BlockNode: {:?}\r\n", block);
+                match block.block_type {
+                    BlockType::Empty => {
+                        println!("Block (Empty): {:?}\r", block);
                     }
-                    Err(e) => {
-                        println!("Erroneous NodeBlock result: {:?}\r\n", e);
-                        // continue... could still return
+                    BlockType::Node => {
+                        let node_block = map_bincode_error!(bincode::deserialize::<NodeBlock>(&buffer))?;
+                        println!("Block (Node): {:?}\r", node_block);
+                    }
+                    BlockType::Relationship => {
+                        let relationship_block = map_bincode_error!(bincode::deserialize::<RelationshipBlock>(&buffer))?;
+                        println!("Block (Relationship): {:?}\r", relationship_block);
+                    }
+                    BlockType::Attribute => {
+                        println!("Block (Attribute): {:?}\r", block);
+                    }
+                    BlockType::Unset => {
+                        println!("Block (Unset): {:?}\r", block);
                     }
                 }
             }
@@ -213,7 +221,7 @@ fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
                     return Ok(curr_offset - struct_size);
                 }
             }
-            Err(e) => {
+            Err(_e) => {
                 // println!("Erroneous NodeBlock result: {:?}", e);
                 // continue... could still return
             }
@@ -224,7 +232,7 @@ fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
 
 // Debug function
 pub fn print_first_empty() -> Result<()> {
-    let stream = File::open(PATH)?;
+    let _stream = File::open(PATH)?;
     // println!("First Empty: {}", get_first_empty(&stream)?);
     Ok(())
 }
@@ -253,30 +261,22 @@ pub fn compare_attribute(attrib1: &Attribute, attrib2: &Attribute) -> bool {
 }
 
 //  Given offset, return node structure
-pub fn get_node(offset: &usize) -> Result<Node> {
+pub fn get_node(offset: u64) -> Result<Node> {
     let node: Node = Default::default();
     let mut stream = File::open(PATH)?;
 
     // Rewind the stream to the beginning
-    stream.seek(SeekFrom::Start(*offset as u64))?;
+    stream.seek(SeekFrom::Start(offset))?;
 
     // Read the block from the stream
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
     stream.read_to_end(&mut buffer)?;
 
+    // Decode bytes into Block struct
+    let deserialised_block = map_bincode_error!(bincode::deserialize::<NodeBlock>(&buffer))?;
 
-    // let result = bincode::deserialize(&buffer);
-    
-    // if result.is_ok(){
-    //     let block: NodeBlock = result.unwrap();
-    //     node = block.node;
-    //     return Ok(node)
-    // }
-    // else{
-    //     println!("In get-node Error: {:?}", result);
-    // }
-
-    Ok(node)
+    // Return the block
+    return Ok(deserialised_block.node);
 }
 
 //  Create Node and write it to disk
@@ -288,7 +288,7 @@ pub fn create_node(new_node: Node) -> Result<()> {
     let mut header;
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
     stream.read_to_end(&mut buffer)?;
-    let mut header_result = bincode::deserialize::<Header>(&buffer);
+    let header_result = bincode::deserialize::<Header>(&buffer);
 
     match header_result {
         Ok(h) => {
@@ -327,7 +327,7 @@ pub fn create_node(new_node: Node) -> Result<()> {
     // update first empty
     let new_first_empty = get_first_empty(&stream, &header);
 
-    // update header TODO: test functionality
+    // update header
     match new_first_empty {
         Ok(offset) => {
             if offset == 0{
@@ -365,40 +365,105 @@ pub fn create_node(new_node: Node) -> Result<()> {
     }
 }
 
-pub fn test_nodes() -> (){
-    // define test nodes
-    let node1 = Node {
-        id: 1,
-        name: "node1".to_string(),
-        rlt_head: 0,
-        attr_head: 0,
+pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    // read header
+    let mut header;
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
+
+    let header_result = bincode::deserialize::<Header>(&buffer);
+
+    match header_result {
+        Ok(h) => {
+            header = h;
+        }
+        Err(e) => {
+            // e incompatible with Result<()>...
+            // return early
+            println!("{}", e);
+            return custom_error!("Error in reading header");
+        }
+    }
+
+    // go to first empty
+    stream.seek(SeekFrom::Start(header.first_empty))?;
+
+    let relationship_block = RelationshipBlock {
+        block_type: BlockType::Relationship,
+        relationship: new_relationship,
+        pad: [0; 16],   // TODO: remove this...
     };
 
-    let node2 = Node {
-        id: 2,
-        name: "node2".to_string(),
-        rlt_head: 0,
-        attr_head: 0,
-    };
+    // write relationship information
+    let serialized_relationship_block = bincode::serialize(&relationship_block);
 
-    let node3 = Node {
-        id: 3,
-        name: "node3".to_string(),
-        rlt_head: 0,
-        attr_head: 0,
-    };
+    match serialized_relationship_block {
+        Ok(bytes) => {
+            stream.write_all(&bytes)?;
+        }
+        Err(e) => {
+            // e incompatible with Result<()>...
+            println!("{}", e);
+            return custom_error!("Error in serializing relationship block");
+        }
+    }
 
-    let _a = create_node(node1);
-    let _b = create_node(node2);
-    let _c = create_node(node3);
+    // update first empty
+    let new_first_empty = get_first_empty(&stream, &header);
 
-    // println!("1: {:?}", a);
-    // println!("2: {:?}", b);
-    // println!("3: {:?}", c);
+    match new_first_empty{
+        Ok(offset) => {
+            header.first_empty = offset;
+
+            // write header
+            stream.seek(SeekFrom::Start(0))?;
+
+            // let serialized_header = bincode::serialize(&header)?;
+            let serialized_header = map_bincode_error!(bincode::serialize(&header))?;
+
+            stream.write_all(&serialized_header)?;
+
+            // // write if ok... TODO: investigate using ? on bincode...
+            // if let Ok(bytes) = serialized_header {
+            //     stream.write_all(&bytes)?;
+            // } else if let Err(e) = serialized_header {
+            //     println!("{}", e);
+            //     return custom_error!("Error in serializing header");
+            // }
+        }
+        Err(e) => {
+            println!("New First Empty Returned Error: {:?}", e);
+            return Err(e);
+        }
+    }
+
+    Ok(())
 }
 
 //  Given id, return node Address
-// fn u64 getNodeFromID(int id);
+pub fn get_node_from_ID(id: u64) -> Result<Node> {
+    // read header
+    let mut stream = OpenOptions::new().read(true).open(PATH)?;
+
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
+
+    let header_result = map_bincode_error!(bincode::deserialize::<Header>(&buffer))?;
+
+    for i in 0..header_result.total_blocks {
+        let offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
+        let node = get_node(offset)?;
+
+        if node.id == id as usize {
+            return Ok(node);
+        }
+    }
+
+    return Err(custom_error!("Not found, FATAL..."));
+}
+
 
 //  Returns node address given node name
 // fn u64 getNodeAddressFromName(char* nodeName);
@@ -435,9 +500,6 @@ pub fn test_nodes() -> (){
 //  If the relationships exists, extract data and write to file
 // fn bool writeRelationship(const char* filename, Relationship relationship);
 
-//  Create Relationship and write to disk
-// fn bool createRelationship(const char* filename, fn u64 nodeFrom, fn u64 nodeTo);
-
 //  Create Attribute and write it to disk
 // fn bool createAttribute(const char* filename, char* attrib);
 
@@ -469,3 +531,62 @@ pub fn test_nodes() -> (){
 
 //  Export GDB for visualisation with Python
 // fn bool exportGraphDatabase();
+
+pub fn test_nodes() -> (){
+    // define test nodes
+    let node1 = Node {
+        id: 1,
+        name: "node1".to_string(),
+        rlt_head: 0,
+        attr_head: 0,
+    };
+
+    let node2 = Node {
+        id: 2,
+        name: "node2".to_string(),
+        rlt_head: 0,
+        attr_head: 0,
+    };
+
+    let node3 = Node {
+        id: 3,
+        name: "node3".to_string(),
+        rlt_head: 0,
+        attr_head: 0,
+    };
+
+    let _a = create_node(node1);
+    let _b = create_node(node2);
+    let _c = create_node(node3);
+
+    // println!("1: {:?}", a);
+    // println!("2: {:?}", b);
+    // println!("3: {:?}", c);
+}
+
+pub fn test_relationships() -> (){
+    let rlt1 = Relationship {
+        node_from: get_node_from_ID(1).unwrap().id,
+        node_to: get_node_from_ID(2).unwrap().id,
+        rlt_next: 0,
+        attr_head: 0,
+    };
+
+    let rlt2 = Relationship {
+        node_from: get_node_from_ID(2).unwrap().id,
+        node_to: get_node_from_ID(3).unwrap().id,
+        rlt_next: 0,
+        attr_head: 0,
+    };
+
+    let rlt3 = Relationship {
+        node_from: get_node_from_ID(3).unwrap().id,
+        node_to: get_node_from_ID(1).unwrap().id,
+        rlt_next: 0,
+        attr_head: 0,
+    };
+
+    let _a = create_relationship(rlt1);
+    let _b = create_relationship(rlt2);
+    let _c = create_relationship(rlt3);
+}

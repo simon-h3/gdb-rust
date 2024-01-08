@@ -28,10 +28,10 @@ fn db_test() {
 
     // disk::print_first_empty();
 
-
+    println!("Relationships: {:?}", disk::test_relationships());
     // let n = disk::print_block(24);
 
-    disk::print_all_blocks();
+    println!("blocks: {:?}", disk::print_all_blocks());
 
     println!("Header 2: {:?}", disk::print_header());
 }

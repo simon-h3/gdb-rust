@@ -11,5 +11,6 @@ serde_derive = "1"
 bincode = "1"
 byteorder = "1"
 libc = "0.2"
-ncurses = "5.101.0"
+ncurses = "*"
+
 

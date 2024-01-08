@@ -2,8 +2,7 @@
 pub const PATH: &str = "test_database.db";
 
 use std::mem;
-use serde::ser::SerializeStruct;
-
+use std::mem::size_of;
 use serde_derive::{Serialize, Deserialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -30,31 +29,12 @@ pub struct Header {
     pub db_size: usize,
 }
 
-// impl Serialize for Header {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
-//         let mut state = serializer.serialize_struct("Header", 3)?;
-//         state.serialize_field("total_blocks", &self.total_blocks)?;
-//         state.serialize_field("first_empty", &self.first_empty)?;
-//         state.serialize_field("db_size", &self.db_size)?;
-//         state.end()
-//     }
-// }
-
 #[derive(Debug, Serialize, Deserialize)]
 #[repr(C)]
 pub struct NodeBlock {
     pub block_type: BlockType,
     pub node: Node,
 }
-
-// impl Serialize for NodeBlock {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
-//         let mut state = serializer.serialize_struct("NodeBlock", 2)?;
-//         state.serialize_field("block_type", &self.block_type)?;
-//         state.serialize_field("node", &self.node)?;
-//         state.end()
-//     }
-// }
 
 impl Default for NodeBlock {
     fn default() -> Self {
@@ -72,12 +52,6 @@ impl Default for NodeBlock {
     }
 }
 
-// #[derive(Debug, Deserialize)]
-// #[repr(C)]
-// pub struct EmptyBlock {
-//     pub block_type: BlockType,
-//     pub node: Node,
-// }
 
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -89,18 +63,14 @@ pub struct Node {
     pub attr_head: usize,
 }
 
-// impl Serialize for Node {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
-//         let mut state = serializer.serialize_struct("Node", 4)?;
-//         state.serialize_field("id", &self.id)?;
-//         state.serialize_field("name", &self.name)?;
-//         state.serialize_field("rlt_head", &self.rlt_head)?;
-//         state.serialize_field("attr_head", &self.attr_head)?;
-//         state.end()
-//     }
-// }
+#[derive(Default, Debug, Serialize, Deserialize)]
+#[repr(C)]
+pub struct Block {
+    pub block_type: BlockType,
+    pub pad: Vec<u8>,
+}
 
-#[derive(Default, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[repr(C)]
 pub struct Relationship {
     pub node_from: usize,
@@ -109,13 +79,28 @@ pub struct Relationship {
     pub attr_head: usize,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
+#[repr(C)]
+pub struct RelationshipBlock {
+    pub block_type: BlockType,
+    pub relationship: Relationship,
+    pub pad: [u8; 16],
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[repr(C)]
 pub struct Attribute {
     pub value: String,
     pub attr_next: usize,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[repr(C)]
+pub struct AttributeBlock {
+    pub block_type: BlockType,
+    pub attribute: Attribute,
+    pub pad: [u8; 16],
+}
 
 // Define a public function that uses the structs
 pub fn print_struct_info() {
@@ -124,6 +109,10 @@ pub fn print_struct_info() {
     println!("Node Size:            {}\r", mem::size_of::<Node>());
     println!("Relationship Size:    {}\r", mem::size_of::<Relationship>());
     println!("Attribute Size:       {}\r", mem::size_of::<Attribute>());
+    println!("NodeBlock Size:       {}\r", mem::size_of::<NodeBlock>());
+    println!("Relt Block Size:      {}\r", mem::size_of::<RelationshipBlock>());
+    println!("AttributeBlock Size:  {}\r", mem::size_of::<AttributeBlock>());
+    println!("Generic Block Size:   {}\r", mem::size_of::<Block>());
     println!("String Size:          {}\r", mem::size_of::<String>());
     println!("----------------------");
 }
