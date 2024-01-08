@@ -1,5 +1,5 @@
 // Define the structs used in the database
-pub const PATH: &str = "test_database.db";
+pub const PATH: &str = "database/test_database.db";
 
 use std::mem;
 use std::mem::size_of;
