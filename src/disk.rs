@@ -1,10 +1,12 @@
 use std::fs::{File, OpenOptions};
-use std::io::{self, Write, Seek, Read, SeekFrom, Result};
+use std::io::{self, Write, Seek, Read, SeekFrom, Result, Error};
 use std::mem::size_of;
 use std::os::unix::fs::FileExt;
+use bincode::{serialize, deserialize};
 
-use crate::types::{Block, Header, NodeBlock, Node, Relationship, Attribute, BlockType, RelationshipBlock};
-use crate::types::PATH;
+use crate::types::{Header, Node, Relationship, Attribute};                              // import structs
+use crate::types::{Block, NodeBlock, RelationshipBlock, AttributeBlock, BlockType};     // import Block Types
+use crate::types::PATH;                                                                // import db PATH
 
 // custom error macro
 macro_rules! custom_error {
@@ -13,6 +15,7 @@ macro_rules! custom_error {
     };
 }
 
+// map bincode error to io error
 macro_rules! map_bincode_error {
     ($expr:expr) => {
         $expr.map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, format!("Bincode serialization error: {:?}", err)))
@@ -35,8 +38,9 @@ pub fn format_disk(record_no: usize) -> Result<()>{
 
     println!("Header: {:?}\r", header);
 
-    let serialized_header = bincode::serialize(&header);
-    let mut serialized_block = bincode::serialize(&block);
+    // TODO: Check if serialize macro better?
+    let serialized_header = serialize(&header);
+    let mut serialized_block = serialize(&block);
 
     if serialized_header.is_ok() && serialized_block.is_ok(){
 
@@ -50,7 +54,7 @@ pub fn format_disk(record_no: usize) -> Result<()>{
         // write empty blocks to file:
         // loop in increments of block size
         for _ in 0..record_no {
-            serialized_block = bincode::serialize(&block);
+            serialized_block = serialize(&block);
             stream.write_at(&serialized_block.unwrap(), offset)?; // safe to unwrap as checked above
             offset += node_block_size as u64;
         }
@@ -64,6 +68,39 @@ pub fn format_disk(record_no: usize) -> Result<()>{
 
 //  Grow output file when total blocks > blocks available, implemented to dynamically scale Database files.
 // fn bool expandFile(const char* outfile, int newRecordNo);
+fn expand_file(amount: u64) -> Result<()>{
+    // open file in append mode:
+    let mut stream = OpenOptions::new().append(true).open(PATH)?;
+
+    // get current file size:
+    let current_size = stream.metadata()?.len();    // needed? or can use seek?
+
+    // serialise Unset block
+    let block: NodeBlock = Default::default(); // NodeBlock used but is set to Unset...
+    let serialized_block = map_bincode_error!(serialize(&block))?;
+
+    // write empty blocks to file:
+    for _ in 0..amount {
+        stream.write_all(&serialized_block)?;
+    }
+
+    // update header to reflect new db size
+    // read header
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
+    let mut header = map_bincode_error!(deserialize::<Header>(&buffer))?;
+
+    // update header
+    header.db_size += amount as usize * size_of::<NodeBlock>();
+    header.total_blocks += amount;
+
+    // write header
+    stream.seek(SeekFrom::Start(0))?;
+    let serialized_header = map_bincode_error!(serialize(&header))?;
+    stream.write_all(&serialized_header)?;
+
+    Ok(())
+}
 
 // Print header of file, given file name.
 pub fn print_header() -> Result<()>{
@@ -72,19 +109,20 @@ pub fn print_header() -> Result<()>{
     // read and print header
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
     // let mut buffer: Vec<u8> = vec![0; 24];
-    let read_result = stream.read_to_end(&mut buffer);
+    stream.read_to_end(&mut buffer)?;
 
-    match read_result {
-        Ok(_) => {
-            println!("Read Result: {:?}\r", read_result);
-        }
-        Err(e) => {
-            println!("Error in reading header: {:?}", e);
-            return custom_error!("Error in reading header");
-        }
-    }
+    // TODO: remove
+    // match read_result {
+    //     Ok(_) => {
+    //         println!("Read Result: {:?}\r", read_result);
+    //     }
+    //     Err(e) => {
+    //         println!("Error in reading header: {:?}", e);
+    //         return custom_error!("Error in reading header");
+    //     }
+    // }
 
-    let result = bincode::deserialize::<Header>(&buffer);
+    let result = deserialize::<Header>(&buffer);
 
     match result {
         Ok(header) => {
@@ -98,97 +136,112 @@ pub fn print_header() -> Result<()>{
     }
 }
 
-//  Shortcut header printer (of all files)
-// fn printHeaders();
-
 //  Given an offset print node to console.
-// fn printNodeName(fn offset: u64);
+pub fn print_node_name(offset: u64) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).open(PATH).unwrap();
 
-// Print attributes of a Relationship given a relationship
-// fn printRelationship(relationship: Relationship);
-
-//  Print any generic block given offset.
-pub fn print_block(offset: u64) -> Result<()>{
-    // let mut stream = File::create(PATH)?;   // should be open...
-    let mut stream = OpenOptions::new().read(true).open(PATH)?;
     // Move to offset
-    println!("Seeking -> Offset: {}\r", offset);
     stream.seek(SeekFrom::Start(offset))?;
 
     // Read bytes into Block struct
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
-    // let mut buffer: Vec<u8> = vec![0; 56];
     stream.read_to_end(&mut buffer)?;
 
     // Decode bytes into Block struct
-    let result = bincode::deserialize::<NodeBlock>(&buffer);
+    let result_node = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+    println!("-> {}", result_node.node.name);
+    Ok(())
+}
 
-    match result {
-        Ok(block) => {
-            println!("Block (Node): {:?}\r", block);
+pub fn print_block(block: Block, buffer: Vec<u8>) -> Result<()>{
+    match block.block_type {
+        BlockType::Node => {
+            let node_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+            println!("Node: {:?}\r", node_block);
         }
-        Err(e) => {
-            println!("Error in printing block: {:?}", e);
+        BlockType::Relationship => {
+            let relationship_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+            println!("Relationship: {:?}\r", relationship_block);
+        }
+        BlockType::Attribute => {
+            let attribute_block = map_bincode_error!(deserialize::<AttributeBlock>(&buffer))?;
+            println!("Attribute: {:?}\r", attribute_block);
+        }
+        BlockType::Empty => {
+            println!("Empty found");
+        }
+        BlockType::Unset => {
+            println!("Unset");
         }
     }
 
     Ok(())
 }
 
+//  Print any generic block given offset.
+pub fn print_block_offset(offset: u64) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).open(PATH)?;
+    // Move to offset
+    println!("Seeking -> Offset: {}\r", offset);
+    stream.seek(SeekFrom::Start(offset))?;
+
+    // Read bytes into Block struct
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Block>());
+    stream.read_to_end(&mut buffer)?;
+
+    // Decode bytes into Block struct
+    let block = map_bincode_error!(deserialize::<Block>(&buffer))?;
+
+    print_block(block, buffer)?;
+    Ok(())
+}
+
 //  Print all blocks in file.
 pub fn print_all_blocks() -> Result<()>{
     let mut stream = OpenOptions::new().read(true).open(PATH)?;
-    let mut curr_offset = size_of::<Header>() as u64;
 
     // read header
-    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
-    stream.read_to_end(&mut buffer)?;
-    let header_result = bincode::deserialize::<Header>(&buffer);
+    let mut header_buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut header_buffer)?;
+    let header = map_bincode_error!(deserialize::<Header>(&header_buffer))?;
 
-    match header_result {
-        Ok(h) => {
-            stream.seek(SeekFrom::Start(curr_offset))?;
+    for i in 0..header.total_blocks {
+        let curr_offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
 
-            for _ in 0..h.total_blocks {
-                // Read bytes into Block struct
-                let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
-                stream.read_to_end(&mut buffer)?;
+        // Move to offset
+        stream.seek(SeekFrom::Start(curr_offset))?;
+        let mut buffer = Vec::with_capacity(size_of::<Block>());
+        stream.read_to_end(&mut buffer)?;
 
-                // Decode bytes into Block struct TODO: generic block, recast into corresponding block type
-                let block = map_bincode_error!(bincode::deserialize::<Block>(&buffer))?;
-                // move to next block (for next iteration)
-                curr_offset += size_of::<NodeBlock>() as u64;
-                stream.seek(SeekFrom::Start(curr_offset))?;
+        let block = get_block(curr_offset)?;
 
-                match block.block_type {
-                    BlockType::Empty => {
-                        println!("Block (Empty): {:?}\r", block);
-                    }
-                    BlockType::Node => {
-                        let node_block = map_bincode_error!(bincode::deserialize::<NodeBlock>(&buffer))?;
-                        println!("Block (Node): {:?}\r", node_block);
-                    }
-                    BlockType::Relationship => {
-                        let relationship_block = map_bincode_error!(bincode::deserialize::<RelationshipBlock>(&buffer))?;
-                        println!("Block (Relationship): {:?}\r", relationship_block);
-                    }
-                    BlockType::Attribute => {
-                        println!("Block (Attribute): {:?}\r", block);
-                    }
-                    BlockType::Unset => {
-                        println!("Block (Unset): {:?}\r", block);
-                    }
-                }
+        // use block printing function instead...
+        match block.block_type {
+            BlockType::Node => {
+                let node_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+                println!("Node: {:?}\r", node_block);
             }
-        }
-        Err(e) => {
-            // e incompatible with Result<()>...
-            // return early
-            println!("{}", e);
-            return custom_error!("Error in reading header");
+            BlockType::Relationship => {
+                let relationship_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+                println!("Relationship: {:?}\r", relationship_block);
+            }
+            BlockType::Attribute => {
+                let attribute_block = map_bincode_error!(deserialize::<AttributeBlock>(&buffer))?;
+                println!("Attribute: {:?}\r", attribute_block);
+            }
+            BlockType::Empty => {
+                println!("Empty found");
+            }
+            BlockType::Unset => {
+                println!("Unset");
+            }
+            _ => {
+                println!("Block Type Unknown...");
+            }
         }
     }
 
+    // println!("Returning aaaaa");
     Ok(())
 }
 
@@ -196,7 +249,7 @@ fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
     // let mut buffer: Vec<u8> = vec![0; size_of::<Header>()];
 
     // stream.read_to_end(&mut buffer)?; // read header
-    // let result = bincode::deserialize::<Header>(&buffer); // decode header
+    // let result = deserialize::<Header>(&buffer); // decode header
 
     let struct_size = size_of::<NodeBlock>() as u64;
     let mut curr_offset = size_of::<Header>() as u64;
@@ -209,7 +262,7 @@ fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
         stream.read_to_end(&mut buffer)?;   // TODO: find alternative to read_to_end...
 
         // Decode bytes into Block struct
-        let result = bincode::deserialize::<NodeBlock>(&buffer);
+        let result = deserialize::<NodeBlock>(&buffer);
 
         // move to next block (for next iteration)
         curr_offset += struct_size;
@@ -262,7 +315,6 @@ pub fn compare_attribute(attrib1: &Attribute, attrib2: &Attribute) -> bool {
 
 //  Given offset, return node structure
 pub fn get_node(offset: u64) -> Result<Node> {
-    let node: Node = Default::default();
     let mut stream = File::open(PATH)?;
 
     // Rewind the stream to the beginning
@@ -273,10 +325,27 @@ pub fn get_node(offset: u64) -> Result<Node> {
     stream.read_to_end(&mut buffer)?;
 
     // Decode bytes into Block struct
-    let deserialised_block = map_bincode_error!(bincode::deserialize::<NodeBlock>(&buffer))?;
+    let deserialised_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
 
     // Return the block
     return Ok(deserialised_block.node);
+}
+
+pub fn get_block(offset: u64) -> Result<Block>{
+    let mut stream = File::open(PATH)?;
+
+    // Rewind the stream to the beginning
+    stream.seek(SeekFrom::Start(offset))?;
+
+    // Read the block from the stream
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
+    stream.read_to_end(&mut buffer)?;
+
+    // Decode bytes into Block struct
+    let deserialised_block = map_bincode_error!(deserialize::<Block>(&buffer))?;
+
+    // Return the block
+    return Ok(deserialised_block);
 }
 
 //  Create Node and write it to disk
@@ -288,7 +357,7 @@ pub fn create_node(new_node: Node) -> Result<()> {
     let mut header;
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
     stream.read_to_end(&mut buffer)?;
-    let header_result = bincode::deserialize::<Header>(&buffer);
+    let header_result = deserialize::<Header>(&buffer);
 
     match header_result {
         Ok(h) => {
@@ -311,7 +380,7 @@ pub fn create_node(new_node: Node) -> Result<()> {
     };
 
     // write node information
-    let serialized_node_block = bincode::serialize(&node_block);
+    let serialized_node_block = serialize(&node_block);
 
     match serialized_node_block {
         Ok(bytes) => {
@@ -341,7 +410,7 @@ pub fn create_node(new_node: Node) -> Result<()> {
                 // write header
                 stream.seek(SeekFrom::Start(0))?;
 
-                let serialized_header = bincode::serialize(&header);
+                let serialized_header = serialize(&header);
 
                 match serialized_header {
                     Ok(bytes) => {
@@ -373,7 +442,7 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
     stream.read_to_end(&mut buffer)?;
 
-    let header_result = bincode::deserialize::<Header>(&buffer);
+    let header_result = deserialize::<Header>(&buffer);
 
     match header_result {
         Ok(h) => {
@@ -397,7 +466,7 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     };
 
     // write relationship information
-    let serialized_relationship_block = bincode::serialize(&relationship_block);
+    let serialized_relationship_block = serialize(&relationship_block);
 
     match serialized_relationship_block {
         Ok(bytes) => {
@@ -420,8 +489,8 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
             // write header
             stream.seek(SeekFrom::Start(0))?;
 
-            // let serialized_header = bincode::serialize(&header)?;
-            let serialized_header = map_bincode_error!(bincode::serialize(&header))?;
+            // let serialized_header = serialize(&header)?;
+            let serialized_header = map_bincode_error!(serialize(&header))?;
 
             stream.write_all(&serialized_header)?;
 
@@ -450,7 +519,7 @@ pub fn get_node_from_ID(id: u64) -> Result<Node> {
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
     stream.read_to_end(&mut buffer)?;
 
-    let header_result = map_bincode_error!(bincode::deserialize::<Header>(&buffer))?;
+    let header_result = map_bincode_error!(deserialize::<Header>(&buffer))?;
 
     for i in 0..header_result.total_blocks {
         let offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
@@ -468,9 +537,25 @@ pub fn get_node_from_ID(id: u64) -> Result<Node> {
 //  Returns node address given node name
 // fn u64 getNodeAddressFromName(char* nodeName);
 
-//  Basic Find node function
-// fn u64 getNodeAddress(Node* node);
+//  Basic Find node function TODO: test...
+pub fn get_node_address(node: Node) -> Result<u64>{
+    let mut stream = OpenOptions::new().read(true).open(PATH)?;
 
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
+
+    let header = map_bincode_error!(deserialize::<Header>(&buffer))?;
+
+    for i in 0..header.total_blocks {
+        let offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
+        let current_node = get_node(offset)?;
+
+        if compare_node(&current_node, &node) {
+            return Ok(offset);
+        }
+    }
+    return Err(custom_error!("Not found, FATAL..."));
+}
 //  Returns relationships address given a relationship
 // fn u64 getRelationshipAddress(Relationship relationship);
 
@@ -486,8 +571,23 @@ pub fn get_node_from_ID(id: u64) -> Result<Node> {
 // fn u64 getAttributeAddress(Attribute attribute);
 
 //  Traverse file and print each block
-// fn printAllNodes(const char* filename);
+pub fn print_all_nodes() -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).open(PATH)?;
 
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
+
+    let header = map_bincode_error!(deserialize::<Header>(&buffer))?;
+
+    for i in 0..header.total_blocks {
+        let offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
+        let node = get_node(offset)?;
+
+        println!("Node: {:?}\r", node);
+    }
+
+    Ok(())
+}
 //  Print all relations FROM a node.
 // fn printFromRelations(fn u64 nodeOffset);
 

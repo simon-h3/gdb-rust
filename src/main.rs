@@ -1,5 +1,6 @@
 mod types;  // Import the types module
 mod disk;
+mod test;
 
 extern crate ncurses;
 
