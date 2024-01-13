@@ -1,7 +1,6 @@
 // Define the structs used in the database
 pub const PATH: &str = "database/test_database.db";
 
-use std::mem;
 use std::mem::size_of;
 use serde_derive::{Serialize, Deserialize};
 
@@ -104,15 +103,15 @@ pub struct AttributeBlock {
 
 // Define a public function that uses the structs
 pub fn print_struct_info() {
-    println!("Header Size:          {}\r", mem::size_of::<Header>());
-    println!("Block Size:           {}\r", mem::size_of::<NodeBlock>());
-    println!("Node Size:            {}\r", mem::size_of::<Node>());
-    println!("Relationship Size:    {}\r", mem::size_of::<Relationship>());
-    println!("Attribute Size:       {}\r", mem::size_of::<Attribute>());
-    println!("NodeBlock Size:       {}\r", mem::size_of::<NodeBlock>());
-    println!("Relt Block Size:      {}\r", mem::size_of::<RelationshipBlock>());
-    println!("AttributeBlock Size:  {}\r", mem::size_of::<AttributeBlock>());
-    println!("Generic Block Size:   {}\r", mem::size_of::<Block>());
-    println!("String Size:          {}\r", mem::size_of::<String>());
+    println!("Header Size:          {}\r", size_of::<Header>());
+    println!("Block Size:           {}\r", size_of::<NodeBlock>());
+    println!("Node Size:            {}\r", size_of::<Node>());
+    println!("Relationship Size:    {}\r", size_of::<Relationship>());
+    println!("Attribute Size:       {}\r", size_of::<Attribute>());
+    println!("NodeBlock Size:       {}\r", size_of::<NodeBlock>());
+    println!("Relt Block Size:      {}\r", size_of::<RelationshipBlock>());
+    println!("AttributeBlock Size:  {}\r", size_of::<AttributeBlock>());
+    println!("Generic Block Size:   {}\r", size_of::<Block>());
+    println!("String Size:          {}\r", size_of::<String>());
     println!("----------------------");
 }
