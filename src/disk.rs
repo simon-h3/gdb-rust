@@ -1,5 +1,5 @@
 use std::fs::{File, OpenOptions};
-use std::io::{self, Write, Seek, Read, SeekFrom, Result, Error, ErrorKind};
+use std::io::{Write, Seek, Read, SeekFrom, Result, Error, ErrorKind};
 use std::mem::size_of;
 use std::os::unix::fs::FileExt;
 use bincode::{serialize, deserialize};
@@ -225,7 +225,7 @@ fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
 
 // Debug function
 pub fn print_first_empty() -> Result<()> {
-    let stream = File::open(PATH)?;
+    let _stream = File::open(PATH)?;
     // println!("First Empty: {}", get_first_empty(&stream)?);
     Ok(())
 }
@@ -380,6 +380,8 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
         return custom_error!("No first empty found, expanded file.")
     }
     else{
+        update_node_rlt(get_node(relationship_block.relationship.node_from)?, header.first_empty)?;
+
         // println!("New First Empty: {}\r", new_first_empty);
         header.first_empty = new_first_empty;
 
@@ -387,8 +389,10 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
         stream.write_at(&serialized_header, 0)?;
 
         println!(" - Create Relationship successful...\r\n");
-        Ok(())
     }
+
+    Ok(())
+
 }
 
 //  Given id, return node Address
@@ -523,7 +527,7 @@ fn append_relationship(node_address: u64, rlt_offset: u64) -> Result<()>{
 
      */
 
-    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
+    let buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
     let relationship_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
 
     if relationship_block.relationship.rlt_next == 0{
@@ -552,6 +556,9 @@ fn update_node_rlt(mut node: Node, rlt_offset: u64) -> Result<()>{
 
     if node.rlt_head == 0{
         node.rlt_head = rlt_offset;
+
+        let serialized_node = map_bincode_error!(serialize(&node))?;
+        stream.write_all_at(&serialized_node, node_address)?;
     }
     else {
         append_relationship(node_address, rlt_offset);
