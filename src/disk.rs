@@ -405,7 +405,7 @@ pub fn get_node_from_id(id: u64) -> Result<Node> {
         let offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
         let node = get_node(offset)?;
 
-        if node.id == id as usize {
+        if node.id == id {
             return Ok(node);
         }
     }
@@ -414,7 +414,7 @@ pub fn get_node_from_id(id: u64) -> Result<Node> {
 }
 
 //  Basic Find node function
-pub fn get_node_address(node: Node) -> Result<u64>{
+pub fn get_node_address(node: &Node) -> Result<u64>{
     let mut stream = OpenOptions::new().read(true).open(PATH)?;
 
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
@@ -433,7 +433,7 @@ pub fn get_node_address(node: Node) -> Result<u64>{
     return Err(custom_error!("Not found, FATAL..."));
 }
 //  Returns relationships address given a relationship
-pub fn get_relationship_address(relationship: &Relationship) -> Result<Relationship>{
+pub fn get_relationship_address(relationship: &Relationship) -> Result<u64>{
     let mut stream = OpenOptions::new().read(true).open(PATH)?;
 
     // read header
@@ -441,7 +441,7 @@ pub fn get_relationship_address(relationship: &Relationship) -> Result<Relations
     stream.read_to_end(&mut buffer)?;
     let header = map_bincode_error!(deserialize::<Header>(&buffer))?;
 
-    for i in header.total_blocks{
+    for i in 0..header.total_blocks{
         let offset = size_of::<Header>() as u64 + (i * size_of::<RelationshipBlock>() as u64);
         let current_relationship = get_relationship(offset)?;
 
@@ -499,10 +499,65 @@ pub fn print_all_nodes() -> Result<()>{
 
 // fn bool updateNodeName(fn u64 node, char* newNodeName);
 
-//  Retrospectively update nodes relationship list head upon creation, if already set follow and set to tail of list.
-// fn bool updateNodeRlt(fn u64 nodeAddress, fn u64 rltHead);
-fn update_node_rlt() -> Result<()>{
+fn append_relationship(node_address: u64, rlt_offset: u64) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
+    stream.seek(SeekFrom::Start(node_address))?;
+
+    /*
+    fread(&relationship_block, sizeof(RelationshipBlock), 1, stream);
+
+    if(relationship_block.relationship.rltNext == 0){
+        relationship_block.relationship.rltNext = newNext;
+
+        fseek(stream, rlt, SEEK_SET);
+        fwrite(&relationship_block, sizeof(RelationshipBlock), 1, stream);
+
+        fclose(stream);
+        return true;
+    }
+    else{
+        fclose(stream);
+        newNextRelationship(relationship_block.relationship.rltNext, newNext);
+    }
+
+     */
+
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
+    let relationship_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+
+    if relationship_block.relationship.rlt_next == 0{
+        relationship_block.relationship.rlt_next == rlt_offset;
+        stream.seek(SeekFrom::Start(node_address))?;
+
+        let serialized_relationship_block = map_bincode_error!(serialize(&relationship_block))?;
+        stream.write_all(&serialized_relationship_block)?;
+        return Ok(())
+    }
+    else{
+        append_relationship(relationship_block.relationship.rlt_next, rlt_offset)?;
+    }
+
+    Ok(())
+}
+
+//  Retrospectively update nodes relationship list head upon creation, if already set follow and set to tail of list.
+fn update_node_rlt(mut node: Node, rlt_offset: u64) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    // send a borrowed instance
+    let node_address = get_node_address(&node)?;
+
+    stream.seek(SeekFrom::Start(node_address))?;
+
+    if node.rlt_head == 0{
+        node.rlt_head = rlt_offset;
+    }
+    else {
+        append_relationship(node_address, rlt_offset);
+    }
+
+    Ok(())
 }
 //  Retrospectively update nodes attribute list head upon creation, if already set follow and set to tail of list.
 // fn bool updateNodeAttribute(fn u64 nodeAddress, fn u64 attribOffset);

@@ -56,10 +56,10 @@ impl Default for NodeBlock {
 #[derive(Default, Debug, Serialize, Deserialize)]
 #[repr(C)]
 pub struct Node {
-    pub id: usize,
+    pub id: u64,
     pub name: String,
-    pub rlt_head: usize,
-    pub attr_head: usize,
+    pub rlt_head: u64,
+    pub attr_head: u64,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -72,10 +72,10 @@ pub struct Block {
 #[derive(Debug, Serialize, Deserialize)]
 #[repr(C)]
 pub struct Relationship {
-    pub node_from: usize,
-    pub node_to: usize,
-    pub rlt_next: usize,
-    pub attr_head: usize,
+    pub node_from: u64,
+    pub node_to: u64,
+    pub rlt_next: u64,
+    pub attr_head: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -90,7 +90,7 @@ pub struct RelationshipBlock {
 #[repr(C)]
 pub struct Attribute {
     pub value: String,
-    pub attr_next: usize,
+    pub attr_next: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
