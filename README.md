@@ -2,7 +2,7 @@
 - [ ] NCurses Menu System
 - [ ] Populate From File
 - [x] Format Disk
-- [ ] Expand Disk
+- [x] Expand Disk
 - [x] Print Headers
 - [ ] Node, Relationship, Attribute and Block Printers
 - [ ] Node, Relationship, Attribute comparisons.
