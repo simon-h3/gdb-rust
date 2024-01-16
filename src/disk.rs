@@ -508,25 +508,6 @@ fn append_relationship(node_address: u64, rlt_offset: u64) -> Result<()>{
 
     stream.seek(SeekFrom::Start(node_address))?;
 
-    /*
-    fread(&relationship_block, sizeof(RelationshipBlock), 1, stream);
-
-    if(relationship_block.relationship.rltNext == 0){
-        relationship_block.relationship.rltNext = newNext;
-
-        fseek(stream, rlt, SEEK_SET);
-        fwrite(&relationship_block, sizeof(RelationshipBlock), 1, stream);
-
-        fclose(stream);
-        return true;
-    }
-    else{
-        fclose(stream);
-        newNextRelationship(relationship_block.relationship.rltNext, newNext);
-    }
-
-     */
-
     let buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
     let relationship_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
 
@@ -561,7 +542,7 @@ fn update_node_rlt(mut node: Node, rlt_offset: u64) -> Result<()>{
         stream.write_all_at(&serialized_node, node_address)?;
     }
     else {
-        append_relationship(node_address, rlt_offset);
+        append_relationship(node_address, rlt_offset)?;
     }
 
     Ok(())
