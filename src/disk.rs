@@ -1,7 +1,7 @@
 use std::fs::{File, OpenOptions};
 use std::io::{Write, Seek, Read, SeekFrom, Result, Error, ErrorKind};
 use std::mem::size_of;
-use std::os::unix::fs::FileExt;
+// use std::os::unix::fs::FileExt;
 use bincode::{serialize, deserialize};
 
 use crate::types::{Header, Node, Relationship, Attribute};                              // import structs
@@ -51,7 +51,8 @@ pub fn format_disk(record_no: u64) -> Result<()>{
     assert_eq!(header.first_empty, size_of::<Header>() as u64);
 
     for _ in 0..header.total_blocks{
-        stream.write_at(&serialized_block, offset)?;
+        stream.seek(SeekFrom::Start(offset))?;
+        stream.write_all(&serialized_block)?;
         offset += node_block_size;
     }
 
@@ -194,7 +195,7 @@ pub fn print_all_blocks() -> Result<()>{
 }
 
 fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
-    const struct_size: u64 = size_of::<NodeBlock>() as u64;
+    const STRUCT_SIZE: u64 = size_of::<NodeBlock>() as u64;
     let mut curr_offset = size_of::<Header>() as u64;
 
     stream.seek(SeekFrom::Start(curr_offset)).unwrap(); // move to first block
@@ -204,23 +205,23 @@ fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
         let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
         stream.read_to_end(&mut buffer)?;   // TODO: find alternative to read_to_end...
 
-        // let mut buffer: [u8; struct_size as usize] //= !needs initialising...;
+        // let mut buffer: [u8; STRUCT_SIZE as usize] //= !needs initialising...;
         // stream.read_exact(&mut buffer)?;
 
         // Decode bytes into Block struct
         let block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
 
         // move to next block (for next iteration)
-        curr_offset += struct_size;
+        curr_offset += STRUCT_SIZE;
         stream.seek(SeekFrom::Start(curr_offset))?;
 
         // return if block is empty or unset
         if block.block_type == BlockType::Empty || block.block_type == BlockType::Unset {
-            return Ok(curr_offset - struct_size);
+            return Ok(curr_offset - STRUCT_SIZE);
         }
     }
     // block not found, preventative option to expand?
-    return custom_error!("Error in getting first empty");
+    custom_error!("Error in getting first empty");
 }
 
 // Debug function
@@ -265,10 +266,9 @@ pub fn get_node(offset: u64) -> Result<Node> {
     stream.read_to_end(&mut buffer)?;
 
     // Decode bytes into Block struct
-    let deserialised_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+    let deserialized_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
 
-    // Return the block
-    return Ok(deserialised_block.node);
+    Ok(deserialized_block.node)
 }
 
 pub fn get_relationship(offset: u64) -> Result<Relationship>{
@@ -331,14 +331,15 @@ pub fn create_node(new_node: Node) -> Result<()> {
     if new_first_empty == 0{
         expand_file(10)?;
         // create_node(&new_node);  //TODO: Remove possibility for 0 offset, expand automatically inside new_first_empty
-        return custom_error!("No first empty found, expanded file.")
+        custom_error!("No first empty found, expanded file.")
     }
     else{
         println!("New First Empty: {}\r", new_first_empty);
         header.first_empty = new_first_empty;
 
         let serialized_header = map_bincode_error!(serialize(&header))?;
-        stream.write_at(&serialized_header, 0)?;
+        stream.seek(SeekFrom::Start(0))?;
+        stream.write_all(&serialized_header)?;
 
         println!(" - Create Node successful...\r\n");
         Ok(())
@@ -377,16 +378,20 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     if new_first_empty == 0{
         expand_file(10)?;
         // create_node(&new_node);  //TODO: recursive call back once expanded...??
-        return custom_error!("No first empty found, expanded file.")
+        custom_error!("No first empty found, expanded file.")
     }
     else{
-        update_node_rlt(get_node(relationship_block.relationship.node_from)?, header.first_empty)?;
+        let node = get_node(relationship_block.relationship.node_from)?; //hello ur gf loves u well done ur coding so good <3 *cheers*
+
+        update_node_rlt(node, header.first_empty)?;
 
         // println!("New First Empty: {}\r", new_first_empty);
         header.first_empty = new_first_empty;
 
         let serialized_header = map_bincode_error!(serialize(&header))?;
-        stream.write_at(&serialized_header, 0)?;
+        stream.seek(SeekFrom::Start(0))?;
+        // stream.write_at(&serialized_header, 0)?; // linux only command (FileExt)
+        stream.write_all(&serialized_header)?;
 
         println!(" - Create Relationship successful...\r\n");
     }
@@ -414,7 +419,7 @@ pub fn get_node_from_id(id: u64) -> Result<Node> {
         }
     }
 
-    return custom_error!("Not found, FATAL...");
+    custom_error!("Not found, FATAL...");
 }
 
 //  Basic Find node function
@@ -434,7 +439,7 @@ pub fn get_node_address(node: &Node) -> Result<u64>{
             return Ok(offset);
         }
     }
-    return Err(custom_error!("Not found, FATAL..."));
+    custom_error!("Not found, FATAL...");
 }
 //  Returns relationships address given a relationship
 pub fn get_relationship_address(relationship: &Relationship) -> Result<u64>{
@@ -454,7 +459,7 @@ pub fn get_relationship_address(relationship: &Relationship) -> Result<u64>{
         }
     }
 
-    return custom_error!("No Relationship Found, FATAL...");
+    custom_error!("No Relationship Found, FATAL...");
 
 }
 //  Returns attributes address given an attribute
@@ -509,10 +514,10 @@ fn append_relationship(node_address: u64, rlt_offset: u64) -> Result<()>{
     stream.seek(SeekFrom::Start(node_address))?;
 
     let buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
-    let relationship_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+    let mut relationship_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
 
     if relationship_block.relationship.rlt_next == 0{
-        relationship_block.relationship.rlt_next == rlt_offset;
+        relationship_block.relationship.rlt_next = rlt_offset;
         stream.seek(SeekFrom::Start(node_address))?;
 
         let serialized_relationship_block = map_bincode_error!(serialize(&relationship_block))?;
@@ -539,7 +544,10 @@ fn update_node_rlt(mut node: Node, rlt_offset: u64) -> Result<()>{
         node.rlt_head = rlt_offset;
 
         let serialized_node = map_bincode_error!(serialize(&node))?;
-        stream.write_all_at(&serialized_node, node_address)?;
+        stream.seek(SeekFrom::Start(node_address))?;
+        // stream.write_all_at(&serialized_node, node_address)?;    // linux only command (FileExt)
+        stream.write_all(&serialized_node)?;
+
     }
     else {
         append_relationship(node_address, rlt_offset)?;
@@ -603,29 +611,31 @@ pub fn test_nodes() -> (){
     // println!("3: {:?}", c);
 }
 
-pub fn test_relationships() -> (){
+pub fn test_relationships() -> Result<()>{
     let rlt1 = Relationship {
-        node_from: get_node_from_id(1).unwrap().id,
-        node_to: get_node_from_id(2).unwrap().id,
+        node_from: get_node_from_id(1)?.id,
+        node_to: get_node_from_id(2)?.id,
         rlt_next: 0,
         attr_head: 0,
     };
 
     let rlt2 = Relationship {
-        node_from: get_node_from_id(2).unwrap().id,
-        node_to: get_node_from_id(3).unwrap().id,
+        node_from: get_node_from_id(2)?.id,
+        node_to: get_node_from_id(3)?.id,
         rlt_next: 0,
         attr_head: 0,
     };
 
     let rlt3 = Relationship {
-        node_from: get_node_from_id(3).unwrap().id,
-        node_to: get_node_from_id(1).unwrap().id,
+        node_from: get_node_from_id(3)?.id,
+        node_to: get_node_from_id(1)?.id,
         rlt_next: 0,
         attr_head: 0,
     };
 
-    let _a = create_relationship(rlt1);
-    let _b = create_relationship(rlt2);
-    let _c = create_relationship(rlt3);
+    create_relationship(rlt1)?;
+    create_relationship(rlt2)?;
+    create_relationship(rlt3)?;
+
+    Ok(())
 }

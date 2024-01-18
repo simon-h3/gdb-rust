@@ -1,5 +1,5 @@
 # RUST - GRAPH DATABASE
-- [ ] NCurses Menu System
+- [ ] TUI (not ncurses) Menu System
 - [ ] Populate From File
 - [x] Format Disk
 - [x] Expand Disk
