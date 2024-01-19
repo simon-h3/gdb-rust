@@ -12,7 +12,7 @@ const TITLE: &str = r#"
 fn db_test() {
     types::print_struct_info();
 
-    println!("Format: {:?}", disk::format_disk(10));
+    println!("Format: {:?}", disk::format_disk(15));
     println!("Header: {:?}", disk::print_header());
 
     // println!("Block 1: {:?}", disk::print_block(24));

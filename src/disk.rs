@@ -195,21 +195,21 @@ pub fn print_all_blocks() -> Result<()>{
 }
 
 fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
-    const STRUCT_SIZE: u64 = size_of::<NodeBlock>() as u64;
+    const STRUCT_SIZE: u64 = size_of::<Block>() as u64;
     let mut curr_offset = size_of::<Header>() as u64;
 
-    stream.seek(SeekFrom::Start(curr_offset)).unwrap(); // move to first block
+    stream.seek(SeekFrom::Start(curr_offset))?; // move to first block
 
     for _ in 0..header.total_blocks {
         // Read bytes into Block struct
-        let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
+        let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Block>());
         stream.read_to_end(&mut buffer)?;   // TODO: find alternative to read_to_end...
 
         // let mut buffer: [u8; STRUCT_SIZE as usize] //= !needs initialising...;
         // stream.read_exact(&mut buffer)?;
 
         // Decode bytes into Block struct
-        let block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+        let block = map_bincode_error!(deserialize::<Block>(&buffer))?;
 
         // move to next block (for next iteration)
         curr_offset += STRUCT_SIZE;
@@ -381,7 +381,7 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
         custom_error!("No first empty found, expanded file.")
     }
     else{
-        let node = get_node(relationship_block.relationship.node_from)?; //hello ur gf loves u well done ur coding so good <3 *cheers*
+        let node = get_node_from_id(relationship_block.relationship.node_from)?;
 
         update_node_rlt(node, header.first_empty)?;
 
@@ -397,7 +397,6 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     }
 
     Ok(())
-
 }
 
 //  Given id, return node Address
@@ -602,9 +601,9 @@ pub fn test_nodes() -> (){
         attr_head: 0,
     };
 
-    let _a = create_node(node1);
-    let _b = create_node(node2);
-    let _c = create_node(node3);
+    let a = create_node(node1);
+    let b = create_node(node2);
+    let c = create_node(node3);
 
     // println!("1: {:?}", a);
     // println!("2: {:?}", b);
@@ -613,29 +612,35 @@ pub fn test_nodes() -> (){
 
 pub fn test_relationships() -> Result<()>{
     let rlt1 = Relationship {
-        node_from: get_node_from_id(1)?.id,
-        node_to: get_node_from_id(2)?.id,
+        node_from: 1,
+        node_to: 2,
         rlt_next: 0,
         attr_head: 0,
     };
 
     let rlt2 = Relationship {
-        node_from: get_node_from_id(2)?.id,
-        node_to: get_node_from_id(3)?.id,
+        node_from: 2,
+        node_to: 3,
         rlt_next: 0,
         attr_head: 0,
     };
 
     let rlt3 = Relationship {
-        node_from: get_node_from_id(3)?.id,
-        node_to: get_node_from_id(1)?.id,
+        node_from: 3,
+        node_to: 1,
         rlt_next: 0,
         attr_head: 0,
     };
 
+    println!("{:?}", rlt1);
+    println!("{:?}", rlt2);
+    println!("{:?}", rlt3);
+
     create_relationship(rlt1)?;
     create_relationship(rlt2)?;
     create_relationship(rlt3)?;
+
+    println!("RltS creation successful...");
 
     Ok(())
 }
