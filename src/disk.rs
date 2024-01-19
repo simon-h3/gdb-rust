@@ -194,6 +194,10 @@ pub fn print_all_blocks() -> Result<()>{
     Ok(())
 }
 
+fn print_relationship(relationship: &Relationship){
+    println!("Relationship: {:?}\r", relationship);
+}
+
 fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
     const STRUCT_SIZE: u64 = size_of::<Block>() as u64;
     let mut curr_offset = size_of::<Header>() as u64;
@@ -399,6 +403,15 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     Ok(())
 }
 
+pub fn create_attribute() -> Result<()>{
+    let stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    // TODO: ...
+    
+
+    Ok(())
+}
+
 //  Given id, return node Address
 pub fn get_node_from_id(id: u64) -> Result<Node> {
     // read header
@@ -491,7 +504,37 @@ pub fn print_all_nodes() -> Result<()>{
     Ok(())
 }
 //  Print all relations FROM a node.
-// fn printFromRelations(fn u64 nodeOffset);
+pub fn print_from_relations(node: &Node) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).open(PATH)?;
+
+    match node.rlt_head {
+        0 => {
+            println!("No relations found");
+            return Ok(())
+        }
+        _ => {
+            stream.seek(SeekFrom::Start(node.rlt_head))?;
+            let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
+            stream.read_to_end(&mut buffer)?;
+            let rlt = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+            stream.seek(SeekFrom::Start(rlt.relationship.rlt_next))?;
+
+            print_relationship(&rlt.relationship);
+
+            while rlt.relationship.rlt_next != 0{
+                let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
+                stream.read_to_end(&mut buffer)?;
+                let rlt = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+
+                print_relationship(&rlt.relationship);
+
+                stream.seek(SeekFrom::Start(rlt.relationship.rlt_next))?;
+            }
+        }
+    }
+
+    Ok(())
+}
 
 //  Print all relations TO a node.
 // fn printToRelations(fn u64 nodeOffset);
@@ -530,6 +573,29 @@ fn append_relationship(node_address: u64, rlt_offset: u64) -> Result<()>{
     Ok(())
 }
 
+fn append_attribute(node_address: u64, attribute_offset: u64) -> Result<()> {
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    stream.seek(SeekFrom::Start(node_address))?;
+
+    let buffer: Vec<u8> = Vec::with_capacity(size_of::<AttributeBlock>());
+    let mut attribute_block = map_bincode_error!(deserialize::<AttributeBlock>(&buffer))?;
+
+    if attribute_block.attribute.attr_next == 0{
+        attribute_block.attribute.attr_next = attribute_offset;
+        stream.seek(SeekFrom::Start(node_address))?;
+
+        let serialized_attribute_block = map_bincode_error!(serialize(&attribute_block))?;
+        stream.write_all(&serialized_attribute_block)?;
+        return Ok(())
+    }
+    else{
+        append_attribute(attribute_block.attribute.attr_next, attribute_offset)?;
+    }
+
+    Ok(())
+}
+
 //  Retrospectively update nodes relationship list head upon creation, if already set follow and set to tail of list.
 fn update_node_rlt(mut node: Node, rlt_offset: u64) -> Result<()>{
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
@@ -556,6 +622,30 @@ fn update_node_rlt(mut node: Node, rlt_offset: u64) -> Result<()>{
 }
 //  Retrospectively update nodes attribute list head upon creation, if already set follow and set to tail of list.
 // fn bool updateNodeAttribute(fn u64 nodeAddress, fn u64 attribOffset);
+fn update_node_attribute(mut node: Node, attrib_offset: u64) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    let node_address = get_node_address(&node)?;
+
+
+    if node.attr_head == 0{
+        node.attr_head = attrib_offset;
+
+        let serialized_node = map_bincode_error!(serialize(&node))?;
+        stream.seek(SeekFrom::Start(node_address))?;
+        // stream.write_all_at(&serialized_node, node_address)?;    // linux only command (FileExt)
+
+        stream.seek(SeekFrom::Start(node_address))?;
+        stream.write_all(&serialized_node)?;
+
+    }
+    else {
+        append_attribute(node_address, attribute_offset)?;
+    }
+
+    Ok(())
+}
+
 
 //  Assigns relationshipBlock to EMPTY_BLOCK and writes to disk
 // fn bool deleteRelationship(Relationship relationship);
