@@ -19,13 +19,13 @@ fn db_test() {
 
     // disk::print_first_empty();
 
-    println!("Nodes: {:?}", disk::test_nodes());
+    println!("Nodes: {:?}", test::test_nodes());
 
     // println!("Block 2: {:?}", disk::print_block(24));
 
     // disk::print_first_empty();
 
-    println!("Relationships: {:?}", disk::test_relationships());
+    // println!("Relationships: {:?}", test::test_relationships());
     // let n = disk::print_block(24);
 
     println!("blocks: {:?}", disk::print_all_blocks());

@@ -159,7 +159,7 @@ pub fn print_block_offset(offset: u64) -> Result<()>{
     stream.seek(SeekFrom::Start(offset))?;
 
     // Read bytes into Block struct
-    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Block>());
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
     stream.read_to_end(&mut buffer)?;
 
     // Decode bytes into Block struct
@@ -183,7 +183,7 @@ pub fn print_all_blocks() -> Result<()>{
 
         // Move to offset
         stream.seek(SeekFrom::Start(curr_offset))?;
-        let mut buffer = Vec::with_capacity(size_of::<Block>());
+        let mut buffer = Vec::with_capacity(size_of::<NodeBlock>());
         stream.read_to_end(&mut buffer)?;
 
         let block = get_block(curr_offset)?;
@@ -199,21 +199,21 @@ fn print_relationship(relationship: &Relationship){
 }
 
 fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
-    const STRUCT_SIZE: u64 = size_of::<Block>() as u64;
+    const STRUCT_SIZE: u64 = size_of::<NodeBlock>() as u64;
     let mut curr_offset = size_of::<Header>() as u64;
 
     stream.seek(SeekFrom::Start(curr_offset))?; // move to first block
 
     for _ in 0..header.total_blocks {
         // Read bytes into Block struct
-        let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Block>());
+        let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
         stream.read_to_end(&mut buffer)?;   // TODO: find alternative to read_to_end...
 
         // let mut buffer: [u8; STRUCT_SIZE as usize] //= !needs initialising...;
         // stream.read_exact(&mut buffer)?;
 
         // Decode bytes into Block struct
-        let block = map_bincode_error!(deserialize::<Block>(&buffer))?;
+        let block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
 
         // move to next block (for next iteration)
         curr_offset += STRUCT_SIZE;
@@ -308,12 +308,9 @@ pub fn create_node(new_node: Node) -> Result<()> {
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
     // read header
-    let mut header;
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
     stream.read_to_end(&mut buffer)?;
-    let h = map_bincode_error!(deserialize::<Header>(&buffer))?;
-
-    header = h;
+    let mut header = map_bincode_error!(deserialize::<Header>(&buffer))?;
 
     // go to first empty
     stream.seek(SeekFrom::Start(header.first_empty))?;
@@ -354,13 +351,10 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
     // read header
-    let mut header;
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
     stream.read_to_end(&mut buffer)?;
 
-    let h = map_bincode_error!(deserialize::<Header>(&buffer))?;
-
-    header = h;
+    let mut header = map_bincode_error!(deserialize::<Header>(&buffer))?;
 
     // go to first empty
     stream.seek(SeekFrom::Start(header.first_empty))?;
@@ -621,7 +615,6 @@ fn update_node_rlt(mut node: Node, rlt_offset: u64) -> Result<()>{
     Ok(())
 }
 //  Retrospectively update nodes attribute list head upon creation, if already set follow and set to tail of list.
-// fn bool updateNodeAttribute(fn u64 nodeAddress, fn u64 attribOffset);
 fn update_node_attribute(mut node: Node, attrib_offset: u64) -> Result<()>{
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
@@ -640,7 +633,7 @@ fn update_node_attribute(mut node: Node, attrib_offset: u64) -> Result<()>{
 
     }
     else {
-        append_attribute(node_address, attribute_offset)?;
+        append_attribute(node_address, attrib_offset)?;
     }
 
     Ok(())
@@ -668,69 +661,3 @@ fn update_node_attribute(mut node: Node, attrib_offset: u64) -> Result<()>{
 //  Export GDB for visualisation with Python
 // fn bool exportGraphDatabase();
 
-pub fn test_nodes() -> (){
-    // define test nodes
-    let node1 = Node {
-        id: 1,
-        name: "node1".to_string(),
-        rlt_head: 0,
-        attr_head: 0,
-    };
-
-    let node2 = Node {
-        id: 2,
-        name: "node2".to_string(),
-        rlt_head: 0,
-        attr_head: 0,
-    };
-
-    let node3 = Node {
-        id: 3,
-        name: "node3".to_string(),
-        rlt_head: 0,
-        attr_head: 0,
-    };
-
-    let a = create_node(node1);
-    let b = create_node(node2);
-    let c = create_node(node3);
-
-    // println!("1: {:?}", a);
-    // println!("2: {:?}", b);
-    // println!("3: {:?}", c);
-}
-
-pub fn test_relationships() -> Result<()>{
-    let rlt1 = Relationship {
-        node_from: 1,
-        node_to: 2,
-        rlt_next: 0,
-        attr_head: 0,
-    };
-
-    let rlt2 = Relationship {
-        node_from: 2,
-        node_to: 3,
-        rlt_next: 0,
-        attr_head: 0,
-    };
-
-    let rlt3 = Relationship {
-        node_from: 3,
-        node_to: 1,
-        rlt_next: 0,
-        attr_head: 0,
-    };
-
-    println!("{:?}", rlt1);
-    println!("{:?}", rlt2);
-    println!("{:?}", rlt3);
-
-    create_relationship(rlt1)?;
-    create_relationship(rlt2)?;
-    create_relationship(rlt3)?;
-
-    println!("RltS creation successful...");
-
-    Ok(())
-}

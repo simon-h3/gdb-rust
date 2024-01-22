@@ -66,7 +66,8 @@ pub struct Node {
 #[repr(C)]
 pub struct Block {
     pub block_type: BlockType,
-    pub pad: Vec<u8>,
+    pub pad: [u64; 6],
+
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -111,7 +112,7 @@ pub fn print_struct_info() {
     println!("NodeBlock Size:       {}\r", size_of::<NodeBlock>());
     println!("Relt Block Size:      {}\r", size_of::<RelationshipBlock>());
     println!("AttributeBlock Size:  {}\r", size_of::<AttributeBlock>());
-    println!("Generic Block Size:   {}\r", size_of::<Block>());
+    println!("Generic Block Size:   {}\r", size_of::<Block>()); // !!!!!!!!
     println!("String Size:          {}\r", size_of::<String>());
     println!("----------------------");
 }
