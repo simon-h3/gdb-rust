@@ -51,8 +51,6 @@ impl Default for NodeBlock {
     }
 }
 
-
-
 #[derive(Default, Debug, Serialize, Deserialize)]
 #[repr(C)]
 pub struct Node {

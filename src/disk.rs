@@ -199,21 +199,21 @@ fn print_relationship(relationship: &Relationship){
 }
 
 fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
-    const STRUCT_SIZE: u64 = size_of::<NodeBlock>() as u64;
+    const STRUCT_SIZE: u64 = size_of::<Block>() as u64;
     let mut curr_offset = size_of::<Header>() as u64;
 
     stream.seek(SeekFrom::Start(curr_offset))?; // move to first block
 
     for _ in 0..header.total_blocks {
         // Read bytes into Block struct
-        let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
+        let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Block>());
         stream.read_to_end(&mut buffer)?;   // TODO: find alternative to read_to_end...
 
         // let mut buffer: [u8; STRUCT_SIZE as usize] //= !needs initialising...;
         // stream.read_exact(&mut buffer)?;
 
         // Decode bytes into Block struct
-        let block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+        let block = map_bincode_error!(deserialize::<Block>(&buffer))?;
 
         // move to next block (for next iteration)
         curr_offset += STRUCT_SIZE;

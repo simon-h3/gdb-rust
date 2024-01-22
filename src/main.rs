@@ -25,7 +25,7 @@ fn db_test() {
 
     // disk::print_first_empty();
 
-    // println!("Relationships: {:?}", test::test_relationships());
+    println!("Relationships: {:?}", test::test_relationships());
     // let n = disk::print_block(24);
 
     println!("blocks: {:?}", disk::print_all_blocks());
