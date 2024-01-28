@@ -1,6 +1,7 @@
 mod types;  // Import the types module
 mod disk;
 mod test;
+mod interface;
 
 const TITLE: &str = r#"
             ___  ____   __   ____  _  _    ____   __  ____  __   ____   __   ____  ____ 
@@ -33,5 +34,6 @@ fn db_test() {
     println!("Header 2: {:?}", disk::print_header());
 }
 fn main() {
-    db_test();
+    // db_test();
+    interface::terminal_test();
 }
