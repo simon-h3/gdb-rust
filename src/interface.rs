@@ -1,14 +1,14 @@
 // TUI Menu System...
-use std::{io, thread, time::Duration};
+use std::{io, time::Duration};
 use tui::{
     backend::CrosstermBackend,
-    widgets::{Widget, Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph},
     layout::{Layout, Constraint, Direction},
     Terminal
 };
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, poll, read, KeyEvent},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    event::{Event, KeyCode, poll, read, KeyEvent},
+    terminal::{disable_raw_mode, enable_raw_mode},
 };
 
 #[derive(PartialEq)]
