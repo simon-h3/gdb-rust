@@ -26,7 +26,7 @@ fn db_test() {
 
     // disk::print_first_empty();
 
-    println!("Relationships: {:?}", test::test_relationships());
+    // println!("Relationships: {:?}", test::test_relationships());
     // let n = disk::print_block(24);
 
     println!("blocks: {:?}", disk::print_all_blocks());
@@ -34,6 +34,6 @@ fn db_test() {
     println!("Header 2: {:?}", disk::print_header());
 }
 fn main() {
-    // db_test();
-    interface::terminal_test();
+    db_test();
+    // interface::terminal_test();
 }

@@ -1,7 +1,7 @@
 use std::fs::{File, OpenOptions};
 use std::io::{Write, Seek, Read, SeekFrom, Result, Error, ErrorKind};
 use std::mem::size_of;
-// use std::os::unix::fs::FileExt;
+use std::os::unix::fs::FileExt;
 use bincode::{serialize, deserialize};
 
 use crate::types::{Header, Node, Relationship, Attribute};                              // import structs
@@ -51,8 +51,8 @@ pub fn format_disk(record_no: u64) -> Result<()>{
     assert_eq!(header.first_empty, size_of::<Header>() as u64);
 
     for _ in 0..header.total_blocks{
-        stream.seek(SeekFrom::Start(offset))?;
-        stream.write_all(&serialized_block)?;
+        // stream.seek(SeekFrom::Start(offset))?;
+        stream.write_at(&serialized_block, offset)?;
         offset += node_block_size;
     }
 
@@ -178,16 +178,18 @@ pub fn print_all_blocks() -> Result<()>{
     stream.read_to_end(&mut header_buffer)?;
     let header = map_bincode_error!(deserialize::<Header>(&header_buffer))?;
 
-    for i in 0..header.total_blocks {
-        let curr_offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
+    stream.seek(SeekFrom::Start(size_of::<Header>() as u64))?; // move to first block (after header)
 
+    for i in 0..header.total_blocks {
+        // let curr_offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
+        let curr_offset = 24 + (i * 56);
         // Move to offset
         stream.seek(SeekFrom::Start(curr_offset))?;
         let mut buffer = Vec::with_capacity(size_of::<NodeBlock>());
         stream.read_to_end(&mut buffer)?;
 
         let block = get_block(curr_offset)?;
-
+        println!(": {:?}\r", curr_offset);
         print_block(block, buffer)?;
     }
 
@@ -292,12 +294,11 @@ pub fn get_block(offset: u64) -> Result<Block>{
     stream.seek(SeekFrom::Start(offset))?;
 
     // Read the block from the stream
-    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Block>());
     stream.read_to_end(&mut buffer)?;
 
     // Decode bytes into Block struct
     let deserialised_block = map_bincode_error!(deserialize::<Block>(&buffer))?;
-
     // Return the block
     return Ok(deserialised_block);
 }
@@ -383,12 +384,12 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
 
         update_node_rlt(node, header.first_empty)?;
 
-        // println!("New First Empty: {}\r", new_first_empty);
+        println!("New First Empty: {}\r", new_first_empty);
         header.first_empty = new_first_empty;
 
         let serialized_header = map_bincode_error!(serialize(&header))?;
-        stream.seek(SeekFrom::Start(0))?;
-        // stream.write_at(&serialized_header, 0)?; // linux only command (FileExt)
+        // stream.seek(SeekFrom::Start(0))?;
+        stream.write_at(&serialized_header, 0)?; // linux only command (FileExt)
         stream.write_all(&serialized_header)?;
 
         println!(" - Create Relationship successful...\r\n");
