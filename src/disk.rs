@@ -654,10 +654,48 @@ fn update_node_attribute(mut node: Node, attrib_offset: u64) -> Result<()>{
 // fn bool deleteNodeName(char* name);
 
 //  Given a Node remove its record
-// fn bool deleteNode(Node node);
+// TODO: test
+pub fn delete_node(node: Node) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    let node_address = get_node_address(&node)?;
+
+    // read node information
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
+    stream.read_to_end(&mut buffer)?;
+    let mut node_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+
+    node_block.block_type = BlockType::Empty;
+
+    // write node information
+    let serialized_node_block = map_bincode_error!(serialize(&node_block))?;
+    stream.seek(SeekFrom::Start(node_address))?;
+    stream.write_all(&serialized_node_block)?;
+
+    Ok(())
+}
 
 //  Given an offset and file, remove corresponding record
-// fn bool deleteRecordOffset(const char* filename, fn u64 offset);
+// TODO: test
+pub fn delete_record_offset(offset: u64) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    stream.seek(SeekFrom::Start(offset))?;
+
+    // read block information
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Block>());
+    stream.read_to_end(&mut buffer)?;
+    let mut block = map_bincode_error!(deserialize::<Block>(&buffer))?;
+
+    block.block_type = BlockType::Empty;
+
+    // write block information
+    let serialized_block = map_bincode_error!(serialize(&block))?;
+    stream.seek(SeekFrom::Start(offset))?;
+    stream.write_all(&serialized_block)?;
+
+    Ok(())
+}
 
 //  Export GDB for visualisation with Python
 // fn bool exportGraphDatabase();
