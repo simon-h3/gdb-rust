@@ -96,6 +96,7 @@ dependencies = [
  "byteorder",
  "crossterm 0.27.0",
  "libc",
+ "log",
  "serde",
  "serde_derive",
  "tui",

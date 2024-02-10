@@ -2,7 +2,9 @@ use std::fs::{File, OpenOptions};
 use std::io::{Write, Seek, Read, SeekFrom, Result, Error, ErrorKind};
 use std::mem::size_of;
 use std::os::unix::fs::FileExt;
+use std::process::exit;
 use bincode::{serialize, deserialize};
+use log::error;
 
 use crate::types::{Header, Node, Relationship, Attribute};                              // import structs
 use crate::types::{Block, NodeBlock, RelationshipBlock, AttributeBlock, BlockType};     // import Block Types
@@ -26,7 +28,7 @@ macro_rules! map_bincode_error {
 pub fn format_disk(record_no: u64) -> Result<()>{
     let mut stream = File::create(PATH)?;
     let node_block_size = size_of::<NodeBlock>() as u64;
-    let db_size: u64 = size_of::<Header>() as u64 + (node_block_size * record_no);
+    let db_size: u64 = size_of::<Header>() as u64 + (node_block_size * record_no) + 56 * 2; // added padding, prevents EoF errors
 
     let block: NodeBlock = Default::default();
 
@@ -181,15 +183,15 @@ pub fn print_all_blocks() -> Result<()>{
     stream.seek(SeekFrom::Start(size_of::<Header>() as u64))?; // move to first block (after header)
 
     for i in 0..header.total_blocks {
-        // let curr_offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
-        let curr_offset = 24 + (i * 56);
+        let curr_offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
+        // let curr_offset = 24 + (i * 56);
         // Move to offset
         stream.seek(SeekFrom::Start(curr_offset))?;
         let mut buffer = Vec::with_capacity(size_of::<NodeBlock>());
         stream.read_to_end(&mut buffer)?;
 
         let block = get_block(curr_offset)?;
-        println!(": {:?}\r", curr_offset);
+        println!("@: {:?}\r", curr_offset);
         print_block(block, buffer)?;
     }
 
@@ -298,9 +300,23 @@ pub fn get_block(offset: u64) -> Result<Block>{
     stream.read_to_end(&mut buffer)?;
 
     // Decode bytes into Block struct
-    let deserialised_block = map_bincode_error!(deserialize::<Block>(&buffer))?;
+    let deserialised_block = deserialize::<Block>(&buffer);
+
+    return match deserialised_block {
+        Ok(block_ok) => {
+            // println!("Block Okay!");
+            Ok(block_ok)
+        }
+        Err(block_not_ok) => {
+            println!("Block Not Okay!");
+            // bad
+            custom_error!(block_not_ok);
+            // exit(1);
+        }
+    }
+
     // Return the block
-    return Ok(deserialised_block);
+    // return Ok(deserialised_block);
 }
 
 //  Create Node and write it to disk

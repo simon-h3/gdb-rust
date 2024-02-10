@@ -13,7 +13,7 @@ const TITLE: &str = r#"
 fn db_test() {
     types::print_struct_info();
 
-    println!("Format: {:?}", disk::format_disk(15));
+    println!("Format: {:?}", disk::format_disk(20));
     println!("Header: {:?}", disk::print_header());
 
     // println!("Block 1: {:?}", disk::print_block(24));
@@ -26,7 +26,7 @@ fn db_test() {
 
     // disk::print_first_empty();
 
-    // println!("Relationships: {:?}", test::test_relationships());
+    println!("Relationships: {:?}", test::test_relationships());
     // let n = disk::print_block(24);
 
     println!("blocks: {:?}", disk::print_all_blocks());
