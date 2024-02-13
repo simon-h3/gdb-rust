@@ -148,6 +148,9 @@ pub fn print_block(block: Block, buffer: &Vec<u8>) -> Result<()>{
         BlockType::Unset => {
             println!("Unset");
         }
+        _ =>{
+            println!("Unknown...");
+        }
     }
 
     Ok(())
@@ -379,7 +382,7 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     let relationship_block = RelationshipBlock {
         block_type: BlockType::Relationship,
         relationship: new_relationship,
-        pad: [0; 16],   // ??
+        pad: [0; 16],   // pad for consistent sizing across block types
     };
 
     // write relationship information
@@ -392,8 +395,8 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     // update header
     if new_first_empty == 0{
         expand_file(10)?;
-        // create_node(&new_node);  //TODO: recursive call back once expanded...??
-        custom_error!("No first empty found, expanded file.")
+        create_relationship(new_relationship)?;  //TODO: recursive call back once expanded...??
+        // custom_error!("No first empty found, expanded file.")
     }
     else{
         let node = get_node_from_id(relationship_block.relationship.node_from)?;
@@ -403,9 +406,9 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
         // println!("New First Empty: {}\r", new_first_empty);
         header.first_empty = new_first_empty;
 
+        // write updated header
         let serialized_header = map_bincode_error!(serialize(&header))?;
-        // stream.seek(SeekFrom::Start(0))?;
-        stream.write_at(&serialized_header, 0)?; // linux only command (FileExt)
+        stream.seek(SeekFrom::Start(0))?;
         stream.write_all(&serialized_header)?;
 
         println!(" - Create Relationship successful...\r\n");
@@ -589,22 +592,24 @@ pub fn print_to_relations(node_offset: u64) -> Result<()>{
 fn append_relationship(node_address: u64, rlt_offset: u64) -> Result<()>{
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
-    stream.seek(SeekFrom::Start(node_address))?;
+    let node = get_node(node_address)?;
+
+    stream.seek(SeekFrom::Start(node.rlt_head))?;
 
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
-    stream.read_to_end(&mut buffer)?; // ?
-    let mut relationship_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
 
-    if relationship_block.relationship.rlt_next == 0{
-        relationship_block.relationship.rlt_next = rlt_offset;
-        stream.seek(SeekFrom::Start(node_address))?;
+    stream.read_to_end(&mut buffer)?;
 
-        let serialized_relationship_block = map_bincode_error!(serialize(&relationship_block))?;
-        stream.write_all(&serialized_relationship_block)?;
-        return Ok(())
+    let rlt = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+
+    if rlt.relationship.rlt_next == 0{
+        rlt.relationship.rlt_next == rlt_offset;
+
+
+
     }
-    else{
-        append_relationship(relationship_block.relationship.rlt_next, rlt_offset)?;
+    else {
+        append_relationship(rlt.relationship.rlt_next, rlt_offset)?;
     }
 
     Ok(())
@@ -615,7 +620,8 @@ fn append_attribute(node_address: u64, attribute_offset: u64) -> Result<()> {
 
     stream.seek(SeekFrom::Start(node_address))?;
 
-    let buffer: Vec<u8> = Vec::with_capacity(size_of::<AttributeBlock>());
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<AttributeBlock>());
+    stream.read_to_end(&mut buffer)?;
     let mut attribute_block = map_bincode_error!(deserialize::<AttributeBlock>(&buffer))?;
 
     if attribute_block.attribute.attr_next == 0{
@@ -639,7 +645,6 @@ fn update_node_rlt(mut node: Node, rlt_offset: u64) -> Result<()>{
 
     // send a borrowed instance
     let node_address = get_node_address(&node)?;
-
     stream.seek(SeekFrom::Start(node_address))?;
 
     if node.rlt_head == 0{
@@ -649,6 +654,7 @@ fn update_node_rlt(mut node: Node, rlt_offset: u64) -> Result<()>{
         stream.seek(SeekFrom::Start(node_address))?;
         // stream.write_all_at(&serialized_node, node_address)?;    // linux only command (FileExt)
         stream.write_all(&serialized_node)?;
+        println!("Updated Node...");
 
     }
     else {
@@ -662,7 +668,6 @@ fn update_node_attribute(mut node: Node, attrib_offset: u64) -> Result<()>{
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
     let node_address = get_node_address(&node)?;
-
 
     if node.attr_head == 0{
         node.attr_head = attrib_offset;

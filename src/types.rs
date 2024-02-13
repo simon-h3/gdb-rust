@@ -68,7 +68,7 @@ pub struct Block {
 
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[repr(C)]
 pub struct Relationship {
     pub node_from: u64,
