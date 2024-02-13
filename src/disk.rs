@@ -86,7 +86,7 @@ fn expand_file(amount: u64) -> Result<()>{
     let mut header = map_bincode_error!(deserialize::<Header>(&buffer))?;
 
     // update header
-    header.db_size += amount as usize * size_of::<NodeBlock>();
+    header.db_size += amount * size_of::<NodeBlock>() as u64;
     header.total_blocks += amount;
 
     // write header
@@ -214,7 +214,7 @@ fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
         stream.read_to_end(&mut buffer)?;   // TODO: find alternative to read_to_end...
 
         // let mut buffer: [u8; STRUCT_SIZE as usize] //= !needs initialising...;
-        // stream.read_exact(&mut buffer)?;
+        // stream.read_to_end_exact(&mut buffer)?;
 
         // Decode bytes into Block struct
         let block = map_bincode_error!(deserialize::<Block>(&buffer))?;
@@ -379,12 +379,12 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     let relationship_block = RelationshipBlock {
         block_type: BlockType::Relationship,
         relationship: new_relationship,
-        pad: [0; 16],
+        pad: [0; 16],   // ??
     };
 
     // write relationship information
     let serialized_relationship_block = map_bincode_error!(serialize(&relationship_block))?;
-    stream.write_all(&serialized_relationship_block)?;
+    stream.write(&serialized_relationship_block)?;
 
     // update first empty
     let new_first_empty = get_first_empty(&stream, &header)?;

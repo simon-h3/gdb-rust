@@ -25,7 +25,7 @@ impl Default for BlockType {
 pub struct Header {
     pub total_blocks: u64,
     pub first_empty: u64,
-    pub db_size: usize,
+    pub db_size: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
