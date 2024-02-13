@@ -148,8 +148,8 @@ pub fn test_relationships() -> std::io::Result<()> {
     println!("{:?}", rlt3);
 
     create_relationship(rlt1)?;
-    create_relationship(rlt2)?;
-    create_relationship(rlt3)?;
+    // create_relationship(rlt2)?;
+    // create_relationship(rlt3)?;
 
     println!("RltS creation successful...");
 

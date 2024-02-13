@@ -128,7 +128,7 @@ pub fn print_node_name(offset: u64) -> Result<()>{
     Ok(())
 }
 
-pub fn print_block(block: Block, buffer: Vec<u8>) -> Result<()>{
+pub fn print_block(block: Block, buffer: &Vec<u8>) -> Result<()>{
     match block.block_type {
         BlockType::Node => {
             let node_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
@@ -167,7 +167,7 @@ pub fn print_block_offset(offset: u64) -> Result<()>{
     // Decode bytes into Block struct
     let block = map_bincode_error!(deserialize::<Block>(&buffer))?;
 
-    print_block(block, buffer)?;
+    print_block(block, &buffer)?;
     Ok(())
 }
 
@@ -192,7 +192,7 @@ pub fn print_all_blocks() -> Result<()>{
 
         let block = get_block(curr_offset)?;
         println!("@: {:?}\r", curr_offset);
-        print_block(block, buffer)?;
+        print_block(block, &buffer)?;
     }
 
     Ok(())
@@ -296,7 +296,7 @@ pub fn get_block(offset: u64) -> Result<Block>{
     stream.seek(SeekFrom::Start(offset))?;
 
     // Read the block from the stream
-    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Block>());
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
     stream.read_to_end(&mut buffer)?;
 
     // Decode bytes into Block struct
@@ -400,7 +400,7 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
 
         update_node_rlt(node, header.first_empty)?;
 
-        println!("New First Empty: {}\r", new_first_empty);
+        // println!("New First Empty: {}\r", new_first_empty);
         header.first_empty = new_first_empty;
 
         let serialized_header = map_bincode_error!(serialize(&header))?;
@@ -548,8 +548,33 @@ pub fn print_from_relations(node: &Node) -> Result<()>{
 }
 
 //  Print all relations TO a node.
-// fn printToRelations(fn u64 nodeOffset);
+pub fn print_to_relations(node_offset: u64) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
 
+    let mut header = map_bincode_error!(deserialize::<Header>(&buffer))?;
+    stream.seek(SeekFrom::Start(node_offset))?;
+
+    buffer = Vec::with_capacity(size_of::<NodeBlock>());
+
+    let node_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+
+    stream.seek(SeekFrom::Start(0))?;
+
+    buffer = Vec::with_capacity(size_of::<RelationshipBlock>());
+
+    for i in 0..header.total_blocks{
+        stream.read_to_end(&mut buffer)?;
+        let temp_rlt = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+
+        if temp_rlt.relationship.node_to == node_block.node.id{
+            print_block(map_bincode_error!(deserialize::<Block>(&buffer))?, &buffer)?;
+        }
+    }
+
+    Ok(())
+}
 //  Print all attributes of a node.
 // fn printAttributes(fn u64 nodeOffset);
 
@@ -566,7 +591,8 @@ fn append_relationship(node_address: u64, rlt_offset: u64) -> Result<()>{
 
     stream.seek(SeekFrom::Start(node_address))?;
 
-    let buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
+    stream.read_to_end(&mut buffer)?; // ?
     let mut relationship_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
 
     if relationship_block.relationship.rlt_next == 0{
