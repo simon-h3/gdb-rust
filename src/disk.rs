@@ -605,7 +605,7 @@ fn append_relationship(node_address: u64, rlt_offset: u64) -> Result<()>{
     if rlt.relationship.rlt_next == 0{
         rlt.relationship.rlt_next == rlt_offset;
 
-
+        // TODO: fix
 
     }
     else {
@@ -745,5 +745,12 @@ pub fn delete_record_offset(offset: u64) -> Result<()>{
 }
 
 //  Export GDB for visualisation with Python
-// fn bool exportGraphDatabase();
+pub fn export_database() -> Result<()>{
+    /*
+        Serialise all nodes, relationships, attributes into JSON
+        for ease later when parsing in visualisation tool...
+     */
+
+    Ok(())
+}
 
