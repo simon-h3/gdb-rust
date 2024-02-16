@@ -1,5 +1,6 @@
 // Define the structs used in the database
 pub const PATH: &str = "database/test_database.db";
+pub const EXPORT_PATH: &str = "database/output.json";
 
 use std::mem::size_of;
 use serde_derive::{Serialize, Deserialize};

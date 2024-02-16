@@ -32,6 +32,8 @@ fn db_test() {
     println!("blocks: {:?}", disk::print_all_blocks());
 
     println!("Header 2: {:?}", disk::print_header());
+
+    println!("Export {:?}", disk::export_database());
 }
 fn main() {
     db_test();

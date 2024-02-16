@@ -8,7 +8,7 @@ use log::error;
 
 use crate::types::{Header, Node, Relationship, Attribute};                              // import structs
 use crate::types::{Block, NodeBlock, RelationshipBlock, AttributeBlock, BlockType};     // import Block Types
-use crate::types::PATH;                                                                // import db PATH
+use crate::types::{PATH, EXPORT_PATH};                                                                // import db PATH
 
 // custom error macro
 macro_rules! custom_error {
@@ -401,7 +401,7 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     else{
         let node = get_node_from_id(relationship_block.relationship.node_from)?;
 
-        update_node_rlt(node, header.first_empty)?;
+        // update_node_rlt(node, header.first_empty)?;
 
         // println!("New First Empty: {}\r", new_first_empty);
         header.first_empty = new_first_empty;
@@ -750,6 +750,52 @@ pub fn export_database() -> Result<()>{
         Serialise all nodes, relationships, attributes into JSON
         for ease later when parsing in visualisation tool...
      */
+
+    let mut out_stream = OpenOptions::new().create(true).write(true).open(EXPORT_PATH)?;
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
+    let header = map_bincode_error!(deserialize::<Header>(&buffer))?;
+
+    for i in 0..header.total_blocks{
+        // let mut block = get_block(i * size_of::<NodeBlock>() as u64)?;
+
+        let mut block_buffer = Vec::with_capacity(size_of::<NodeBlock>());
+        stream.seek(SeekFrom::Start(i * size_of::<NodeBlock>() as u64 + size_of::<Header>() as u64))?;
+        stream.read_to_end(&mut block_buffer)?;
+        let block = map_bincode_error!(deserialize::<Block>(&block_buffer))?;
+        
+        match block.block_type {
+            BlockType::Node => {
+                let struct_data: NodeBlock = map_bincode_error!(deserialize::<NodeBlock>(&block_buffer))?;
+                let json_string = serde_json::to_string(&struct_data.node)?;
+                // writeln!(stream, "{}", json_string)?;
+                out_stream.write_all(json_string.as_bytes()).expect("Failed to write to file");
+                out_stream.write_all(b"\n").expect("Failed to write to file"); // Add a newline after each JSON object
+            },
+            BlockType::Relationship => {
+                let struct_data: RelationshipBlock = map_bincode_error!(deserialize::<RelationshipBlock>(&block_buffer))?;
+                let json_string = serde_json::to_string(&struct_data.relationship)?;
+                // writeln!(stream, "{}", json_string)?;
+                out_stream.write_all(json_string.as_bytes()).expect("Failed to write to file");
+                out_stream.write_all(b"\n").expect("Failed to write to file"); // Add a newline after each JSON object
+            },
+            BlockType::Attribute => {
+                let struct_data: AttributeBlock = map_bincode_error!(deserialize::<AttributeBlock>(&block_buffer))?;
+                let json_string = serde_json::to_string(&struct_data.attribute)?;
+                // writeln!(stream, "{}", json_string)?;
+                out_stream.write_all(json_string.as_bytes()).expect("Failed to write to file");
+                out_stream.write_all(b"\n").expect("Failed to write to file"); // Add a newline after each JSON object
+            },
+            BlockType::Empty => {
+                // do nothing
+            },
+            BlockType::Unset => {
+                // do nothing
+            }
+        }
+    }
 
     Ok(())
 }
