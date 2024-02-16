@@ -1,5 +1,6 @@
 // Define the structs used in the database
 pub const PATH: &str = "database/test_database.db";
+pub const EXPORT_PATH: &str = "database/output.json";
 
 use std::mem::size_of;
 use serde_derive::{Serialize, Deserialize};
@@ -25,7 +26,7 @@ impl Default for BlockType {
 pub struct Header {
     pub total_blocks: u64,
     pub first_empty: u64,
-    pub db_size: usize,
+    pub db_size: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -68,7 +69,7 @@ pub struct Block {
 
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[repr(C)]
 pub struct Relationship {
     pub node_from: u64,

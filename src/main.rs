@@ -13,7 +13,7 @@ const TITLE: &str = r#"
 fn db_test() {
     types::print_struct_info();
 
-    println!("Format: {:?}", disk::format_disk(15));
+    println!("Format: {:?}", disk::format_disk(20));
     println!("Header: {:?}", disk::print_header());
 
     // println!("Block 1: {:?}", disk::print_block(24));
@@ -32,8 +32,10 @@ fn db_test() {
     println!("blocks: {:?}", disk::print_all_blocks());
 
     println!("Header 2: {:?}", disk::print_header());
+
+    println!("Export {:?}", disk::export_database());
 }
 fn main() {
-    // db_test();
-    interface::terminal_test();
+    db_test();
+    // interface::terminal_test();
 }

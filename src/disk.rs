@@ -1,12 +1,14 @@
 use std::fs::{File, OpenOptions};
 use std::io::{Write, Seek, Read, SeekFrom, Result, Error, ErrorKind};
 use std::mem::size_of;
-// use std::os::unix::fs::FileExt;
+use std::os::unix::fs::FileExt;
+use std::process::exit;
 use bincode::{serialize, deserialize};
+use log::error;
 
 use crate::types::{Header, Node, Relationship, Attribute};                              // import structs
 use crate::types::{Block, NodeBlock, RelationshipBlock, AttributeBlock, BlockType};     // import Block Types
-use crate::types::PATH;                                                                // import db PATH
+use crate::types::{PATH, EXPORT_PATH};                                                                // import db PATH
 
 // custom error macro
 macro_rules! custom_error {
@@ -26,7 +28,7 @@ macro_rules! map_bincode_error {
 pub fn format_disk(record_no: u64) -> Result<()>{
     let mut stream = File::create(PATH)?;
     let node_block_size = size_of::<NodeBlock>() as u64;
-    let db_size: u64 = size_of::<Header>() as u64 + (node_block_size * record_no);
+    let db_size: u64 = size_of::<Header>() as u64 + (node_block_size * record_no) + 56 * 2; // added padding, prevents EoF errors
 
     let block: NodeBlock = Default::default();
 
@@ -51,8 +53,8 @@ pub fn format_disk(record_no: u64) -> Result<()>{
     assert_eq!(header.first_empty, size_of::<Header>() as u64);
 
     for _ in 0..header.total_blocks{
-        stream.seek(SeekFrom::Start(offset))?;
-        stream.write_all(&serialized_block)?;
+        // stream.seek(SeekFrom::Start(offset))?;
+        stream.write_at(&serialized_block, offset)?;
         offset += node_block_size;
     }
 
@@ -84,7 +86,7 @@ fn expand_file(amount: u64) -> Result<()>{
     let mut header = map_bincode_error!(deserialize::<Header>(&buffer))?;
 
     // update header
-    header.db_size += amount as usize * size_of::<NodeBlock>();
+    header.db_size += amount * size_of::<NodeBlock>() as u64;
     header.total_blocks += amount;
 
     // write header
@@ -126,7 +128,7 @@ pub fn print_node_name(offset: u64) -> Result<()>{
     Ok(())
 }
 
-pub fn print_block(block: Block, buffer: Vec<u8>) -> Result<()>{
+pub fn print_block(block: Block, buffer: &Vec<u8>) -> Result<()>{
     match block.block_type {
         BlockType::Node => {
             let node_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
@@ -145,6 +147,9 @@ pub fn print_block(block: Block, buffer: Vec<u8>) -> Result<()>{
         }
         BlockType::Unset => {
             println!("Unset");
+        }
+        _ =>{
+            println!("Unknown...");
         }
     }
 
@@ -165,7 +170,7 @@ pub fn print_block_offset(offset: u64) -> Result<()>{
     // Decode bytes into Block struct
     let block = map_bincode_error!(deserialize::<Block>(&buffer))?;
 
-    print_block(block, buffer)?;
+    print_block(block, &buffer)?;
     Ok(())
 }
 
@@ -178,17 +183,19 @@ pub fn print_all_blocks() -> Result<()>{
     stream.read_to_end(&mut header_buffer)?;
     let header = map_bincode_error!(deserialize::<Header>(&header_buffer))?;
 
+    stream.seek(SeekFrom::Start(size_of::<Header>() as u64))?; // move to first block (after header)
+
     for i in 0..header.total_blocks {
         let curr_offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
-
+        // let curr_offset = 24 + (i * 56);
         // Move to offset
         stream.seek(SeekFrom::Start(curr_offset))?;
         let mut buffer = Vec::with_capacity(size_of::<NodeBlock>());
         stream.read_to_end(&mut buffer)?;
 
         let block = get_block(curr_offset)?;
-
-        print_block(block, buffer)?;
+        println!("@: {:?}\r", curr_offset);
+        print_block(block, &buffer)?;
     }
 
     Ok(())
@@ -210,7 +217,7 @@ fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
         stream.read_to_end(&mut buffer)?;   // TODO: find alternative to read_to_end...
 
         // let mut buffer: [u8; STRUCT_SIZE as usize] //= !needs initialising...;
-        // stream.read_exact(&mut buffer)?;
+        // stream.read_to_end_exact(&mut buffer)?;
 
         // Decode bytes into Block struct
         let block = map_bincode_error!(deserialize::<Block>(&buffer))?;
@@ -296,10 +303,23 @@ pub fn get_block(offset: u64) -> Result<Block>{
     stream.read_to_end(&mut buffer)?;
 
     // Decode bytes into Block struct
-    let deserialised_block = map_bincode_error!(deserialize::<Block>(&buffer))?;
+    let deserialised_block = deserialize::<Block>(&buffer);
+
+    return match deserialised_block {
+        Ok(block_ok) => {
+            // println!("Block Okay!");
+            Ok(block_ok)
+        }
+        Err(block_not_ok) => {
+            println!("Block Not Okay!");
+            // bad
+            custom_error!(block_not_ok);
+            // exit(1);
+        }
+    }
 
     // Return the block
-    return Ok(deserialised_block);
+    // return Ok(deserialised_block);
 }
 
 //  Create Node and write it to disk
@@ -362,12 +382,12 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     let relationship_block = RelationshipBlock {
         block_type: BlockType::Relationship,
         relationship: new_relationship,
-        pad: [0; 16],
+        pad: [0; 16],   // pad for consistent sizing across block types
     };
 
     // write relationship information
     let serialized_relationship_block = map_bincode_error!(serialize(&relationship_block))?;
-    stream.write_all(&serialized_relationship_block)?;
+    stream.write(&serialized_relationship_block)?;
 
     // update first empty
     let new_first_empty = get_first_empty(&stream, &header)?;
@@ -375,20 +395,20 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     // update header
     if new_first_empty == 0{
         expand_file(10)?;
-        // create_node(&new_node);  //TODO: recursive call back once expanded...??
-        custom_error!("No first empty found, expanded file.")
+        create_relationship(new_relationship)?;  //TODO: recursive call back once expanded...??
+        // custom_error!("No first empty found, expanded file.")
     }
     else{
         let node = get_node_from_id(relationship_block.relationship.node_from)?;
 
-        update_node_rlt(node, header.first_empty)?;
+        // update_node_rlt(node, header.first_empty)?;
 
         // println!("New First Empty: {}\r", new_first_empty);
         header.first_empty = new_first_empty;
 
+        // write updated header
         let serialized_header = map_bincode_error!(serialize(&header))?;
         stream.seek(SeekFrom::Start(0))?;
-        // stream.write_at(&serialized_header, 0)?; // linux only command (FileExt)
         stream.write_all(&serialized_header)?;
 
         println!(" - Create Relationship successful...\r\n");
@@ -531,8 +551,33 @@ pub fn print_from_relations(node: &Node) -> Result<()>{
 }
 
 //  Print all relations TO a node.
-// fn printToRelations(fn u64 nodeOffset);
+pub fn print_to_relations(node_offset: u64) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
 
+    let mut header = map_bincode_error!(deserialize::<Header>(&buffer))?;
+    stream.seek(SeekFrom::Start(node_offset))?;
+
+    buffer = Vec::with_capacity(size_of::<NodeBlock>());
+
+    let node_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+
+    stream.seek(SeekFrom::Start(0))?;
+
+    buffer = Vec::with_capacity(size_of::<RelationshipBlock>());
+
+    for i in 0..header.total_blocks{
+        stream.read_to_end(&mut buffer)?;
+        let temp_rlt = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+
+        if temp_rlt.relationship.node_to == node_block.node.id{
+            print_block(map_bincode_error!(deserialize::<Block>(&buffer))?, &buffer)?;
+        }
+    }
+
+    Ok(())
+}
 //  Print all attributes of a node.
 // fn printAttributes(fn u64 nodeOffset);
 
@@ -547,21 +592,24 @@ pub fn print_from_relations(node: &Node) -> Result<()>{
 fn append_relationship(node_address: u64, rlt_offset: u64) -> Result<()>{
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
-    stream.seek(SeekFrom::Start(node_address))?;
+    let node = get_node(node_address)?;
 
-    let buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
-    let mut relationship_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+    stream.seek(SeekFrom::Start(node.rlt_head))?;
 
-    if relationship_block.relationship.rlt_next == 0{
-        relationship_block.relationship.rlt_next = rlt_offset;
-        stream.seek(SeekFrom::Start(node_address))?;
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
 
-        let serialized_relationship_block = map_bincode_error!(serialize(&relationship_block))?;
-        stream.write_all(&serialized_relationship_block)?;
-        return Ok(())
+    stream.read_to_end(&mut buffer)?;
+
+    let rlt = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+
+    if rlt.relationship.rlt_next == 0{
+        rlt.relationship.rlt_next == rlt_offset;
+
+        // TODO: fix
+
     }
-    else{
-        append_relationship(relationship_block.relationship.rlt_next, rlt_offset)?;
+    else {
+        append_relationship(rlt.relationship.rlt_next, rlt_offset)?;
     }
 
     Ok(())
@@ -572,7 +620,8 @@ fn append_attribute(node_address: u64, attribute_offset: u64) -> Result<()> {
 
     stream.seek(SeekFrom::Start(node_address))?;
 
-    let buffer: Vec<u8> = Vec::with_capacity(size_of::<AttributeBlock>());
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<AttributeBlock>());
+    stream.read_to_end(&mut buffer)?;
     let mut attribute_block = map_bincode_error!(deserialize::<AttributeBlock>(&buffer))?;
 
     if attribute_block.attribute.attr_next == 0{
@@ -596,7 +645,6 @@ fn update_node_rlt(mut node: Node, rlt_offset: u64) -> Result<()>{
 
     // send a borrowed instance
     let node_address = get_node_address(&node)?;
-
     stream.seek(SeekFrom::Start(node_address))?;
 
     if node.rlt_head == 0{
@@ -606,6 +654,7 @@ fn update_node_rlt(mut node: Node, rlt_offset: u64) -> Result<()>{
         stream.seek(SeekFrom::Start(node_address))?;
         // stream.write_all_at(&serialized_node, node_address)?;    // linux only command (FileExt)
         stream.write_all(&serialized_node)?;
+        println!("Updated Node...");
 
     }
     else {
@@ -619,7 +668,6 @@ fn update_node_attribute(mut node: Node, attrib_offset: u64) -> Result<()>{
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
     let node_address = get_node_address(&node)?;
-
 
     if node.attr_head == 0{
         node.attr_head = attrib_offset;
@@ -653,11 +701,102 @@ fn update_node_attribute(mut node: Node, attrib_offset: u64) -> Result<()>{
 // fn bool deleteNodeName(char* name);
 
 //  Given a Node remove its record
-// fn bool deleteNode(Node node);
+// TODO: test
+pub fn delete_node(node: Node) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    let node_address = get_node_address(&node)?;
+
+    // read node information
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
+    stream.read_to_end(&mut buffer)?;
+    let mut node_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+
+    node_block.block_type = BlockType::Empty;
+
+    // write node information
+    let serialized_node_block = map_bincode_error!(serialize(&node_block))?;
+    stream.seek(SeekFrom::Start(node_address))?;
+    stream.write_all(&serialized_node_block)?;
+
+    Ok(())
+}
 
 //  Given an offset and file, remove corresponding record
-// fn bool deleteRecordOffset(const char* filename, fn u64 offset);
+// TODO: test
+pub fn delete_record_offset(offset: u64) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    stream.seek(SeekFrom::Start(offset))?;
+
+    // read block information
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Block>());
+    stream.read_to_end(&mut buffer)?;
+    let mut block = map_bincode_error!(deserialize::<Block>(&buffer))?;
+
+    block.block_type = BlockType::Empty;
+
+    // write block information
+    let serialized_block = map_bincode_error!(serialize(&block))?;
+    stream.seek(SeekFrom::Start(offset))?;
+    stream.write_all(&serialized_block)?;
+
+    Ok(())
+}
 
 //  Export GDB for visualisation with Python
-// fn bool exportGraphDatabase();
+pub fn export_database() -> Result<()>{
+    /*
+        Serialise all nodes, relationships, attributes into JSON
+        for ease later when parsing in visualisation tool...
+     */
+
+    let mut out_stream = OpenOptions::new().create(true).write(true).open(EXPORT_PATH)?;
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
+    let header = map_bincode_error!(deserialize::<Header>(&buffer))?;
+
+    for i in 0..header.total_blocks{
+        // let mut block = get_block(i * size_of::<NodeBlock>() as u64)?;
+
+        let mut block_buffer = Vec::with_capacity(size_of::<NodeBlock>());
+        stream.seek(SeekFrom::Start(i * size_of::<NodeBlock>() as u64 + size_of::<Header>() as u64))?;
+        stream.read_to_end(&mut block_buffer)?;
+        let block = map_bincode_error!(deserialize::<Block>(&block_buffer))?;
+        
+        match block.block_type {
+            BlockType::Node => {
+                let struct_data: NodeBlock = map_bincode_error!(deserialize::<NodeBlock>(&block_buffer))?;
+                let json_string = serde_json::to_string(&struct_data.node)?;
+                // writeln!(stream, "{}", json_string)?;
+                out_stream.write_all(json_string.as_bytes()).expect("Failed to write to file");
+                out_stream.write_all(b"\n").expect("Failed to write to file"); // Add a newline after each JSON object
+            },
+            BlockType::Relationship => {
+                let struct_data: RelationshipBlock = map_bincode_error!(deserialize::<RelationshipBlock>(&block_buffer))?;
+                let json_string = serde_json::to_string(&struct_data.relationship)?;
+                // writeln!(stream, "{}", json_string)?;
+                out_stream.write_all(json_string.as_bytes()).expect("Failed to write to file");
+                out_stream.write_all(b"\n").expect("Failed to write to file"); // Add a newline after each JSON object
+            },
+            BlockType::Attribute => {
+                let struct_data: AttributeBlock = map_bincode_error!(deserialize::<AttributeBlock>(&block_buffer))?;
+                let json_string = serde_json::to_string(&struct_data.attribute)?;
+                // writeln!(stream, "{}", json_string)?;
+                out_stream.write_all(json_string.as_bytes()).expect("Failed to write to file");
+                out_stream.write_all(b"\n").expect("Failed to write to file"); // Add a newline after each JSON object
+            },
+            BlockType::Empty => {
+                // do nothing
+            },
+            BlockType::Unset => {
+                // do nothing
+            }
+        }
+    }
+
+    Ok(())
+}
 
