@@ -14,4 +14,6 @@
 - [ ] Delete Relationship
 - [ ] Delete Attribute
 
-Export & Visualisation TBC..
+# PYTHON - GRAPH VISUALISATION
+- [x] JSON Export
+- [x] Visualisation with Python
