@@ -8,7 +8,7 @@ use log::error;
 
 use crate::types::{Header, Node, Relationship, Attribute};                              // import structs
 use crate::types::{Block, NodeBlock, RelationshipBlock, AttributeBlock, BlockType};     // import Block Types
-use crate::types::{PATH, EXPORT_PATH};                                                                // import db PATH
+use crate::types::{PATH, EXPORT_PATH};                                                  // import db PATH
 
 // custom error macro
 macro_rules! custom_error {
