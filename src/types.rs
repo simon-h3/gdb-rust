@@ -21,8 +21,9 @@ impl Default for BlockType {
     }
 }
 
+
 #[derive(Default, Debug, Serialize, Deserialize)]
-#[repr(C)]  // This is used to make sure the struct is represented in memory the same way as in C
+#[repr(C)]   
 pub struct Header {
     pub total_blocks: u64,
     pub first_empty: u64,
@@ -30,7 +31,7 @@ pub struct Header {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[repr(C)]
+#[repr(C)]  // This is used to make sure the struct is represented in memory the same way as in C
 pub struct NodeBlock {
     pub block_type: BlockType,
     pub node: Node,
