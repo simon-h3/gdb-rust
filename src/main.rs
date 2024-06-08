@@ -1,8 +1,12 @@
+/*
+    Simon H - 2024
+*/
+
 mod types;  // Import the types module
 mod disk;
 mod test;
 mod interface;
-mod api;
+mod fixed_static_str;
 
 const TITLE: &str = r#"
             ___  ____   __   ____  _  _    ____   __  ____  __   ____   __   ____  ____ 
