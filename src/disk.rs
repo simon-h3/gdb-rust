@@ -217,6 +217,7 @@ fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
 
     stream.seek(SeekFrom::Start(curr_offset))?; // move to first block
 
+    // TODO: check logic
     for _ in 0..header.total_blocks {
         // Read bytes into Block struct
         let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Block>());
