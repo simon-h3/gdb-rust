@@ -1,3 +1,7 @@
+/*
+    Simon H - 2024
+*/
+
 use std::fs::{File, OpenOptions};
 use std::io::{Write, Seek, Read, SeekFrom, Result, Error, ErrorKind};
 use std::mem::size_of;
@@ -6,9 +10,11 @@ use std::process::exit;
 use bincode::{serialize, deserialize};
 use log::error;
 
+// type imports can be combined, but this is easier to read
 use crate::types::{Header, Node, Relationship, Attribute};                              // import structs
 use crate::types::{Block, NodeBlock, RelationshipBlock, AttributeBlock, BlockType};     // import Block Types
-use crate::types::{PATH, EXPORT_PATH};                                                                // import db PATH
+use crate::types::{PATH, EXPORT_PATH};                                                  // import db PATH
+use crate::fixed_static_str::*;                                                         // import fixed static strings helper functions              
 
 // custom error macro
 macro_rules! custom_error {
@@ -124,7 +130,7 @@ pub fn print_node_name(offset: u64) -> Result<()>{
 
     // Decode bytes into Block struct
     let result_node = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
-    println!("-> {}", result_node.node.name);
+    println!("-> {}", char_print(&result_node.node.name));
     Ok(())
 }
 
@@ -211,6 +217,7 @@ fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
 
     stream.seek(SeekFrom::Start(curr_offset))?; // move to first block
 
+    // TODO: check logic
     for _ in 0..header.total_blocks {
         // Read bytes into Block struct
         let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Block>());

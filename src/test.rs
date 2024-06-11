@@ -1,10 +1,14 @@
+/*
+    Simon H - 2024
+*/
+
 use crate::disk::{create_node, create_relationship};
 use crate::types::{Node, Relationship};
-
 // Module: test
 #[cfg(test)]
 mod tests {
     use crate::disk::{create_node, create_relationship, format_disk, print_all_blocks, print_header};
+    use crate::fixed_static_str;
     use crate::test::{test_nodes, test_relationships};
     use crate::types::{Node, Relationship};
 
@@ -60,7 +64,7 @@ mod tests {
 
         let test_node = Node {
             id: 0,
-            name: "test".to_string(),
+            name: fixed_static_str::str_to_fixed_chars("test"),
             rlt_head: 0,
             attr_head: 0,
         };
@@ -90,24 +94,26 @@ mod tests {
 }
 
 pub fn test_nodes() -> (){
+    use crate::fixed_static_str;
+
     // define test nodes
     let node1 = Node {
         id: 1,
-        name: "node1".to_string(),
+        name: fixed_static_str::str_to_fixed_chars("node1"),
         rlt_head: 0,
         attr_head: 0,
     };
 
     let node2 = Node {
         id: 2,
-        name: "node2".to_string(),
+        name: fixed_static_str::str_to_fixed_chars("node2"),
         rlt_head: 0,
         attr_head: 0,
     };
 
     let node3 = Node {
         id: 3,
-        name: "node3".to_string(),
+        name: fixed_static_str::str_to_fixed_chars("node3"),
         rlt_head: 0,
         attr_head: 0,
     };

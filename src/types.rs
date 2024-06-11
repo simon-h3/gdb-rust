@@ -1,3 +1,7 @@
+/*
+    Simon H - 2024
+*/
+
 // Define the structs used in the database
 pub const PATH: &str = "database/test_database.db";
 pub const EXPORT_PATH: &str = "database/output.json";
@@ -44,7 +48,7 @@ impl Default for NodeBlock {
             node: {
                 Node {
                     id: 0,
-                    name: ".".to_string(),
+                    name: ['E','M','P','T','Y','\0','\0','\0','\0','\0','\0','\0','\0','\0','\0','\0'],
                     rlt_head: 0,
                     attr_head: 0,
                 }
@@ -57,7 +61,7 @@ impl Default for NodeBlock {
 #[repr(C)]
 pub struct Node {
     pub id: u64,
-    pub name: String,
+    pub name: [char; 16],
     pub rlt_head: u64,
     pub attr_head: u64,
 }
