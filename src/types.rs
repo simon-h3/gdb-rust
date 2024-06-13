@@ -2,13 +2,17 @@
     Simon H - 2024
 */
 
-// Define the structs used in the database
-pub const PATH: &str = "database/test_database.db";
-pub const EXPORT_PATH: &str = "database/output.json";
+pub const PATH: &str = "database/test_database.db";     // The path to the database
+pub const EXPORT_PATH: &str = "database/output.json";   // The path to the exported database
+pub const RLT_PAD: usize = 7;                          // Relationship padding
+pub const ATR_PAD: usize = RLT_PAD;                           // Attribute padding
 
 use std::mem::size_of;
 use serde_derive::{Serialize, Deserialize};
 
+// Define the structs used in the database...
+
+// BlockType enum
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum BlockType {
     Empty,
@@ -16,6 +20,7 @@ pub enum BlockType {
     Node,
     Relationship,
     Attribute,
+    Final,
 }
 
 // Default is used to set the default value of a struct (when defining empty struct)
@@ -57,6 +62,10 @@ impl Default for NodeBlock {
     }
 }
 
+pub struct TestSize{
+    pub blocks: [u8; 64],
+}
+
 #[derive(Default, Debug, Serialize, Deserialize)]
 #[repr(C)]
 pub struct Node {
@@ -70,7 +79,7 @@ pub struct Node {
 #[repr(C)]
 pub struct Block {
     pub block_type: BlockType,
-    pub pad: [u64; 6],
+    pub pad: [u64; 11],
 
 }
 
@@ -88,7 +97,7 @@ pub struct Relationship {
 pub struct RelationshipBlock {
     pub block_type: BlockType,
     pub relationship: Relationship,
-    pub pad: [u8; 16],
+    pub pad: [u64; RLT_PAD],
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -103,20 +112,30 @@ pub struct Attribute {
 pub struct AttributeBlock {
     pub block_type: BlockType,
     pub attribute: Attribute,
-    pub pad: [u8; 16],
+    pub pad: [u64; ATR_PAD],
 }
 
 // Define a public function that uses the structs
 pub fn print_struct_info() {
+    println!("Test Struct Info:     {}\r", size_of::<TestSize>());
     println!("Header Size:          {}\r", size_of::<Header>());
-    println!("Block Size:           {}\r", size_of::<NodeBlock>());
+    // println!("Block Size:           {}\r", size_of::<NodeBlock>());
     println!("Node Size:            {}\r", size_of::<Node>());
     println!("Relationship Size:    {}\r", size_of::<Relationship>());
     println!("Attribute Size:       {}\r", size_of::<Attribute>());
     println!("NodeBlock Size:       {}\r", size_of::<NodeBlock>());
     println!("Relt Block Size:      {}\r", size_of::<RelationshipBlock>());
     println!("AttributeBlock Size:  {}\r", size_of::<AttributeBlock>());
-    println!("Generic Block Size:   {}\r", size_of::<Block>()); // !!!!!!!!
+    println!("Generic Block Size:   {}\r", size_of::<Block>());
     println!("String Size:          {}\r", size_of::<String>());
     println!("----------------------");
+}
+
+pub fn assert_struct_size_equality() {
+    // let SIZE: usize = size_of::<Header>();
+    let SIZE: usize = size_of::<NodeBlock>();
+    assert_eq!(size_of::<NodeBlock>(), SIZE);
+    assert_eq!(size_of::<RelationshipBlock>(), SIZE); 
+    assert_eq!(size_of::<AttributeBlock>(), SIZE);
+    assert_eq!(size_of::<Block>(), SIZE);
 }

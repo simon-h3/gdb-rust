@@ -13,8 +13,8 @@ use log::error;
 // type imports can be combined, but this is easier to read
 use crate::types::{Header, Node, Relationship, Attribute};                              // import structs
 use crate::types::{Block, NodeBlock, RelationshipBlock, AttributeBlock, BlockType};     // import Block Types
-use crate::types::{PATH, EXPORT_PATH};                                                  // import db PATH
-use crate::fixed_static_str::*;                                                         // import fixed static strings helper functions              
+use crate::types::{PATH, EXPORT_PATH, RLT_PAD};                                         // import db PATH
+use crate::fixed_static_str::*;                                                         // import fixed static strings helper functions
 
 // custom error macro
 macro_rules! custom_error {
@@ -64,12 +64,20 @@ pub fn format_disk(record_no: u64) -> Result<()>{
         offset += node_block_size;
     }
 
+    let mut final_block: Block = Default::default();
+    final_block.block_type = BlockType::Final;
+
+    let serialized_final_block = map_bincode_error!(serialize(&final_block))?;
+
+    stream.write_at(&serialized_final_block, offset)?;
+
     Ok(())
 }
 
-//  Grow output file when total blocks > blocks available, implemented to dynamically scale Database files.
+// Grow output file when total blocks > blocks available, implemented to dynamically scale Database files.
 // fn bool expandFile(const char* outfile, int newRecordNo);
 fn expand_file(amount: u64) -> Result<()>{
+    println!("Expanding file...");
     // open file in append mode:
     let mut stream = OpenOptions::new().append(true).open(PATH)?;
 
@@ -198,6 +206,31 @@ pub fn print_all_blocks() -> Result<()>{
         stream.seek(SeekFrom::Start(curr_offset))?;
         let mut buffer = Vec::with_capacity(size_of::<NodeBlock>());
         stream.read_to_end(&mut buffer)?;
+
+        let block = get_block(curr_offset)?;
+        println!("@: {:?}\r", curr_offset);
+        print_block(block, &buffer)?;
+    }
+
+    Ok(())
+}
+
+pub fn print_n_blocks(n: u64) -> Result<()>{
+    let mut stream = OpenOptions::new().read(true).open(PATH)?;
+
+    let mut header_buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_exact(&mut header_buffer)?;
+
+    stream.seek(SeekFrom::Start(size_of::<Header>() as u64))?;
+
+    for i in 0..n{
+        let curr_offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
+
+        stream.seek(SeekFrom::Start(curr_offset))?;
+        // let mut buffer = [0u8; 96];
+        let mut buffer = Vec::with_capacity(96);
+        println!("Buffer size at {} -> {}", i, std::mem::size_of_val(&buffer));
+        stream.read_exact(&mut buffer)?;
 
         let block = get_block(curr_offset)?;
         println!("@: {:?}\r", curr_offset);
@@ -389,7 +422,7 @@ pub fn create_relationship(new_relationship: Relationship) -> Result<()>{
     let relationship_block = RelationshipBlock {
         block_type: BlockType::Relationship,
         relationship: new_relationship,
-        pad: [0; 16],   // pad for consistent sizing across block types
+        pad: [0; RLT_PAD],   // pad for consistent sizing across block types
     };
 
     // write relationship information
@@ -801,6 +834,8 @@ pub fn export_database() -> Result<()>{
             BlockType::Unset => {
                 // do nothing
             }
+            BlockType::Final => {}
+                // do nothing
         }
     }
 

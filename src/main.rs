@@ -16,7 +16,9 @@ const TITLE: &str = r#"
         "#;
 
 fn db_test() {
+    types::assert_struct_size_equality();
     types::print_struct_info();
+
 
     println!("Format: {:?}", disk::format_disk(20));
     println!("Header: {:?}", disk::print_header());
@@ -31,14 +33,15 @@ fn db_test() {
 
     // disk::print_first_empty();
 
-    println!("Relationships: {:?}", test::test_relationships());
+    println!("Relationships: {:?}\n", test::test_relationships());
     // let n = disk::print_block(24);
 
-    println!("blocks: {:?}", disk::print_all_blocks());
+    println!("blocks: {:?}\n", disk::print_all_blocks());
+    // disk::print_n_blocks(20).expect("Big no no in print_n_blocks...");
 
-    println!("Header 2: {:?}", disk::print_header());
+    println!("Header 2: {:?}\n", disk::print_header());
 
-    println!("Export {:?}", disk::export_database());
+    println!("Export {:?}\n", disk::export_database());
 }
 fn main() {
     db_test();
