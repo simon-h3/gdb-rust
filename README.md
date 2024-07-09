@@ -1,6 +1,7 @@
 # RUST - GRAPH DATABASE
-- [ ] TUI (not ncurses) Menu System
+~~- [ ] TUI (not ncurses) Menu System~~
 - [ ] Populate From File
+- [ ] Populate From HTTP Endpoint
 - [x] Format Disk
 - [x] Expand Disk
 - [x] Print Headers
