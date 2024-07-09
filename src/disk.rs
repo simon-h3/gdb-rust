@@ -507,6 +507,7 @@ pub fn get_node_address(node: &Node) -> Result<u64>{
     }
     custom_error!("Not found, FATAL...");
 }
+
 //  Returns relationships address given a relationship
 pub fn get_relationship_address(relationship: &Relationship) -> Result<u64>{
     let mut stream = OpenOptions::new().read(true).open(PATH)?;

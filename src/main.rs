@@ -19,7 +19,6 @@ fn db_test() {
     types::assert_struct_size_equality();
     types::print_struct_info();
 
-
     println!("Format: {:?}", disk::format_disk(20));
     println!("Header: {:?}", disk::print_header());
 
