@@ -7,6 +7,7 @@ mod disk;
 mod test;
 mod interface;
 mod fixed_static_str;
+mod api;
 
 const TITLE: &str = r#"
             ___  ____   __   ____  _  _    ____   __  ____  __   ____   __   ____  ____ 

@@ -488,6 +488,26 @@ pub fn get_node_from_id(id: u64) -> Result<Node> {
     custom_error!("Not found, FATAL...");
 }
 
+pub fn get_relationship_from_id(id: u64) -> Result<Relationship> {
+    let mut stream = OpenOptions::new().read(true).open(PATH)?;
+
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
+
+    let header_result = map_bincode_error!(deserialize::<Header>(&buffer))?;
+
+    for i in 0..header_result.total_blocks {
+        let offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
+        let rlt = get_relationship(offset)?;
+
+        if rlt.id == id {
+            return Ok(rlt);
+        }
+    }
+
+    custom_error!("Not found, FATAL...");
+}
+
 //  Basic Find node function
 pub fn get_node_address(node: &Node) -> Result<u64>{
     let mut stream = OpenOptions::new().read(true).open(PATH)?;
