@@ -739,11 +739,14 @@ pub fn print_to_relations(node_offset: u64) -> Result<()> {
 }
 //  Print all attributes of a node.
 // fn printAttributes(fn u64 nodeOffset);
-pub fn print_attributes(node_offset: u64) -> Result<()>{
+pub fn print_attributes(node_offset: u64) -> Result<()> {
     let node = get_node(node_offset)?;
 
-    node.
+    // node.attr_head // seek to attr head...
 
+    // TODO: open stream etc... & finish...
+    //
+    Ok(())
 }
 
 //  If the relationships exists, extract data and write to file
