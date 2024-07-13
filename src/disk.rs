@@ -616,9 +616,9 @@ pub fn get_relationship_from_to(name_from: String, name_to: String) -> Result<Re
 
     for i in 0..header.total_blocks {
         let offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
-        let relationship = get_block(offset)?;
+        let block = get_block(offset)?;
 
-        match relationship.block_type {
+        match block.block_type {
             Node => {
                 // nah...
             }
@@ -627,11 +627,16 @@ pub fn get_relationship_from_to(name_from: String, name_to: String) -> Result<Re
                 let node_from_address = get_node_address_from_name(name_from)?;
                 let node_to_address = get_node_address_from_name(name_to)?;
 
-                if (relationship.node_from == node_from_address && relationship.node_to == node_to_address) {
-                    Ok(relationship);   // yay :)
+                let relationship = get_relationship(offset)?;
+
+                // TODO: switch to .eq??
+                if relationship.node_from == node_from_address
+                    && relationship.node_to == node_to_address
+                {
+                    return Ok(relationship); // yay :)
                 }
             }
-
+            // nah...
             Empty => {}
             Unset => {}
             Node => {}
@@ -639,9 +644,10 @@ pub fn get_relationship_from_to(name_from: String, name_to: String) -> Result<Re
             Attribute => {}
             Final => {}
         }
+    }
 
     println!("Requested Relationship Non Existent..."); // TODO: real error needed...
-    Err(())
+    custom_error!("No Relationship Found, FATAL...");
 }
 
 //  Returns attributes address given an attributes content
@@ -735,7 +741,7 @@ pub fn print_to_relations(node_offset: u64) -> Result<()> {
 // fn printAttributes(fn u64 nodeOffset);
 
 //  If the relationships exists, extract data and write to file
-// fn bool writeRelationship(const char* filename, Relationship relationship);
+// fn bool writeRelationship(Relationship relationship);
 
 /*
     Modify node's name
