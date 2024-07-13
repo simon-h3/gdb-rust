@@ -7,7 +7,9 @@ use crate::types::{Node, Relationship};
 // Module: test
 #[cfg(test)]
 mod tests {
-    use crate::disk::{create_node, create_relationship, format_disk, print_all_blocks, print_header};
+    use crate::disk::{
+        create_node, create_relationship, format_disk, print_all_blocks, print_header,
+    };
     use crate::fixed_static_str;
     use crate::test::{test_nodes, test_relationships};
     use crate::types::{Node, Relationship};
@@ -20,7 +22,7 @@ mod tests {
     // }
 
     #[test]
-    fn format_test() {
+    async fn format_test() {
         let result = format_disk(10);
         assert!(result.is_ok());
     }
@@ -32,7 +34,7 @@ mod tests {
     // }
 
     #[test]
-    fn test_print_all_blocks() {
+    async fn test_print_all_blocks() {
         // SETUP
         let result_format = format_disk(10);
         assert!(result_format.is_ok());
@@ -46,7 +48,7 @@ mod tests {
     }
 
     #[test]
-    fn test_print_header() {
+    async fn test_print_header() {
         // SETUP
         let result = format_disk(10);
         assert!(result.is_ok());
@@ -57,7 +59,7 @@ mod tests {
     }
 
     #[test]
-    fn test_node_creation() {
+    async fn test_node_creation() {
         // SETUP
         let result = format_disk(10);
         assert!(result.is_ok());
@@ -75,7 +77,7 @@ mod tests {
     }
 
     #[test]
-    fn test_relationship_creation(){
+    async fn test_relationship_creation() {
         // SETUP
         let result = format_disk(10);
         assert!(result.is_ok());
@@ -93,7 +95,7 @@ mod tests {
     }
 }
 
-pub fn test_nodes() -> (){
+pub fn test_nodes() -> () {
     use crate::fixed_static_str;
 
     // define test nodes

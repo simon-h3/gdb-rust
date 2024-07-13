@@ -521,6 +521,7 @@ pub fn get_node_from_id(id: u64) -> Result<Node> {
     custom_error!("Not found, FATAL...");
 }
 
+/*
 pub fn get_relationship_from_id(id: u64) -> Result<Relationship> {
     let mut stream = OpenOptions::new().read(true).open(PATH)?;
 
@@ -540,6 +541,7 @@ pub fn get_relationship_from_id(id: u64) -> Result<Relationship> {
 
     custom_error!("Not found, FATAL...");
 }
+*/
 
 //  Basic Find node function
 pub fn get_node_address(node: &Node) -> Result<u64> {
@@ -650,15 +652,13 @@ pub fn get_relationship_from_to(name_from: String, name_to: String) -> Result<Re
     custom_error!("No Relationship Found, FATAL...");
 }
 
-//  Returns attributes address given an attributes content
-
+// returns attributes address given an attributes content
 // fn u64 getAttributeAddressContent(char* content);
 
-//  Returns attributes address given an attribute
-
+// returns attributes address given an attribute
 // fn u64 getAttributeAddress(Attribute attribute);
 
-//  Traverse file and print each block
+// traverse file and print each block
 pub fn print_all_nodes() -> Result<()> {
     let mut stream = OpenOptions::new().read(true).open(PATH)?;
 
@@ -739,6 +739,12 @@ pub fn print_to_relations(node_offset: u64) -> Result<()> {
 }
 //  Print all attributes of a node.
 // fn printAttributes(fn u64 nodeOffset);
+pub fn print_attributes(node_offset: u64) -> Result<()>{
+    let node = get_node(node_offset)?;
+
+    node.
+
+}
 
 //  If the relationships exists, extract data and write to file
 // fn bool writeRelationship(Relationship relationship);

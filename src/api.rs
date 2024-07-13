@@ -7,39 +7,39 @@
 #[macro_use]
 extern crate actix_web;
 
-use std::env;
-use actix_web::{get, web, App, HttpServer, Responder, put};
-use actix_web::middleware::Logger;
 use crate::disk;
+use actix_web::middleware::Logger;
+use actix_web::{get, put, web, App, HttpServer, Responder};
+use std::env;
 /*
 
-    GET
-    /node/id            <
-    /relationship/id XXXXXXXX
+   GET
+   /node/id            <
+   /relationship/id XXXXXXXX
 
-    PUT (Update)
+   PUT (Update)
 
-    /node/id/info
-    /relationship/id/info
+   /node/id/info
+   /relationship/id/info
 
-    POST
+   POST
 
-    /node/newId/info
-    /relationship/newId/info
+   /node/newId/info
+   /relationship/newId/info
 
-    DELETE
+   DELETE
 
-    /node/id
-    /relationship/id
+   /node/id
+   /relationship/id
 
- */
+*/
 
 #[post("/node/")]
 async fn http_post_node(incoming_node: web::Json<Node>) -> impl Responder {
     // Process the incoming node data
     println!("Creating node:\t {:?} :\t {:?}", node.id, Utc::now());
 
-    let node: Node = node.into_inner();  // into itself...
+    let node: Node = node.into_inner(); // into itself...
     disk::create_node(node);
 
     println!("Saved node:\t {:?} :\t {:?}\n", node.id, Utc::now());
@@ -49,10 +49,10 @@ async fn http_post_node(incoming_node: web::Json<Node>) -> impl Responder {
 
 #[get("/node/{id}")]
 async fn http_get_node(id: web::Path<String>) -> impl Responder {
-    let id = id.parse::<u64>()?;    // unsafe TODO>>
+    let id = id.parse::<u64>()?; // unsafe TODO>>
     let result = disk::get_node_from_id(id);
 
-//     TODO: return result through HTTP...
+    //     TODO: return result through HTTP...
 }
 
 // #[get("/relationship/{id}")]
@@ -77,8 +77,7 @@ async fn main() -> std::io::Result<()> {
             // register HTTP requests handlers
             .service(http_get_node);
     })
-        .bind(("127.0.0.1", 8080))?
-        .run()
-        .await
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await
 }
-
