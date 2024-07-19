@@ -1,10 +1,17 @@
-use crate::disk::{create_node, create_relationship};
-use crate::types::{Node, Relationship};
+/*
+    Simon H - 2024
+*/
 
+use crate::node::*;
+use crate::relationship::*;
+use crate::types::{Node, Relationship};
 // Module: test
 #[cfg(test)]
 mod tests {
-    use crate::disk::{create_node, create_relationship, format_disk, print_all_blocks, print_header};
+    use crate::disk::*;
+    use crate::node::*;
+    use crate::relationship::*;
+    use crate::str_conversion;
     use crate::test::{test_nodes, test_relationships};
     use crate::types::{Node, Relationship};
 
@@ -16,7 +23,7 @@ mod tests {
     // }
 
     #[test]
-    fn format_test() {
+    async fn format_test() {
         let result = format_disk(10);
         assert!(result.is_ok());
     }
@@ -28,7 +35,7 @@ mod tests {
     // }
 
     #[test]
-    fn test_print_all_blocks() {
+    async fn test_print_all_blocks() {
         // SETUP
         let result_format = format_disk(10);
         assert!(result_format.is_ok());
@@ -42,7 +49,7 @@ mod tests {
     }
 
     #[test]
-    fn test_print_header() {
+    async fn test_print_header() {
         // SETUP
         let result = format_disk(10);
         assert!(result.is_ok());
@@ -53,14 +60,14 @@ mod tests {
     }
 
     #[test]
-    fn test_node_creation() {
+    async fn test_node_creation() {
         // SETUP
         let result = format_disk(10);
         assert!(result.is_ok());
 
         let test_node = Node {
             id: 0,
-            name: "test".to_string(),
+            name: str_conversion::str_to_fixed_chars("test"),
             rlt_head: 0,
             attr_head: 0,
         };
@@ -71,7 +78,7 @@ mod tests {
     }
 
     #[test]
-    fn test_relationship_creation(){
+    async fn test_relationship_creation() {
         // SETUP
         let result = format_disk(10);
         assert!(result.is_ok());
@@ -89,25 +96,27 @@ mod tests {
     }
 }
 
-pub fn test_nodes() -> (){
+pub fn test_nodes() -> () {
+    use crate::str_conversion;
+
     // define test nodes
     let node1 = Node {
         id: 1,
-        name: "node1".to_string(),
+        name: str_conversion::str_to_fixed_chars("node1"),
         rlt_head: 0,
         attr_head: 0,
     };
 
     let node2 = Node {
         id: 2,
-        name: "node2".to_string(),
+        name: str_conversion::str_to_fixed_chars("node2"),
         rlt_head: 0,
         attr_head: 0,
     };
 
     let node3 = Node {
         id: 3,
-        name: "node3".to_string(),
+        name: str_conversion::str_to_fixed_chars("node3"),
         rlt_head: 0,
         attr_head: 0,
     };

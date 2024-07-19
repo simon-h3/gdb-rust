@@ -1,6 +1,6 @@
-{"id":1,"name":"node1","rlt_head":0,"attr_head":0}
-{"id":2,"name":"node2","rlt_head":0,"attr_head":0}
-{"id":3,"name":"node3","rlt_head":0,"attr_head":0}
+{"id":1,"name":["n","o","d","e","1"," "," "," "," "," "," "," "," "," "," "," "],"rlt_head":0,"attr_head":0}
+{"id":2,"name":["n","o","d","e","2"," "," "," "," "," "," "," "," "," "," "," "],"rlt_head":0,"attr_head":0}
+{"id":3,"name":["n","o","d","e","3"," "," "," "," "," "," "," "," "," "," "," "],"rlt_head":0,"attr_head":0}
 {"node_from":1,"node_to":2,"rlt_next":0,"attr_head":0}
 {"node_from":2,"node_to":3,"rlt_next":0,"attr_head":0}
 {"node_from":3,"node_to":1,"rlt_next":0,"attr_head":0}

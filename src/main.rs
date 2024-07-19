@@ -1,16 +1,26 @@
-mod types;  // Import the types module
+/*
+    Simon H - 2024
+*/
+
+mod api;
+mod attribute;
 mod disk;
-mod test;
 mod interface;
+mod node;
+mod relationship;
+mod str_conversion;
+mod test;
+mod types; // Import the types module
 
 const TITLE: &str = r#"
-            ___  ____   __   ____  _  _    ____   __  ____  __   ____   __   ____  ____ 
+            ___  ____   __   ____  _  _    ____   __  ____  __   ____   __   ____  ____
            / __)(  _ \ / _\ (  _ \/ )( \  (    \ / _\(_  _)/ _\ (  _ \ / _\ / ___)(  __)
-          ( (_ \ )   //    \ ) __/) __ (   ) D (/    \ )( /    \ ) _ (/    \\___ \ ) _) 
+          ( (_ \ )   //    \ ) __/) __ (   ) D (/    \ )( /    \ ) _ (/    \\___ \ ) _)
            \___/(__\_)\_/\_/(__)  \_)(_/  (____/\_/\_/(__)\_/\_/(____/\_/\_/(____/(____)
         "#;
 
 fn db_test() {
+    types::assert_struct_size_equality();
     types::print_struct_info();
 
     println!("Format: {:?}", disk::format_disk(20));
@@ -26,14 +36,15 @@ fn db_test() {
 
     // disk::print_first_empty();
 
-    println!("Relationships: {:?}", test::test_relationships());
+    println!("Relationships: {:?}\n", test::test_relationships());
     // let n = disk::print_block(24);
 
-    println!("blocks: {:?}", disk::print_all_blocks());
+    println!("blocks: {:?}\n", disk::print_all_blocks());
+    // disk::print_n_blocks(20).expect("Big no no in print_n_blocks...");
 
-    println!("Header 2: {:?}", disk::print_header());
+    println!("Header 2: {:?}\n", disk::print_header());
 
-    println!("Export {:?}", disk::export_database());
+    println!("Export {:?}\n", disk::export_database());
 }
 fn main() {
     db_test();
