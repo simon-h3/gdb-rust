@@ -4,10 +4,10 @@
 
 */
 
-#[macro_use]
-extern crate actix_web;
+/*
 
 use crate::disk;
+use actix_web;
 use actix_web::middleware::Logger;
 use actix_web::{get, put, web, App, HttpServer, Responder};
 use std::env;
@@ -63,7 +63,7 @@ async fn http_get_node(id: web::Path<String>) -> impl Responder {
 // //     TODO: return result through HTTP...
 // }
 
-#[actix_rt::main]
+#[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
     env_logger::init();
@@ -81,3 +81,5 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
+
+*/

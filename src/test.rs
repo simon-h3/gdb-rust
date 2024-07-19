@@ -10,7 +10,7 @@ mod tests {
     use crate::disk::{
         create_node, create_relationship, format_disk, print_all_blocks, print_header,
     };
-    use crate::fixed_static_str;
+    use crate::str_conversion;
     use crate::test::{test_nodes, test_relationships};
     use crate::types::{Node, Relationship};
 
@@ -66,7 +66,7 @@ mod tests {
 
         let test_node = Node {
             id: 0,
-            name: fixed_static_str::str_to_fixed_chars("test"),
+            name: str_conversion::str_to_fixed_chars("test"),
             rlt_head: 0,
             attr_head: 0,
         };
@@ -96,26 +96,26 @@ mod tests {
 }
 
 pub fn test_nodes() -> () {
-    use crate::fixed_static_str;
+    use crate::str_conversion;
 
     // define test nodes
     let node1 = Node {
         id: 1,
-        name: fixed_static_str::str_to_fixed_chars("node1"),
+        name: str_conversion::str_to_fixed_chars("node1"),
         rlt_head: 0,
         attr_head: 0,
     };
 
     let node2 = Node {
         id: 2,
-        name: fixed_static_str::str_to_fixed_chars("node2"),
+        name: str_conversion::str_to_fixed_chars("node2"),
         rlt_head: 0,
         attr_head: 0,
     };
 
     let node3 = Node {
         id: 3,
-        name: fixed_static_str::str_to_fixed_chars("node3"),
+        name: str_conversion::str_to_fixed_chars("node3"),
         rlt_head: 0,
         attr_head: 0,
     };

@@ -3,19 +3,16 @@
 */
 
 use bincode::{deserialize, serialize};
-use libc::__UT_NAMESIZE;
-use log::error;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Result, Seek, SeekFrom, Write};
 use std::mem::size_of;
-use std::os::unix::fs::{FileExt, OpenOptionsExt};
-use std::process::exit;
+use std::os::unix::fs::FileExt;
 
 // type imports can be combined, but this is easier to read
-use crate::fixed_static_str::{self, *};
 use crate::types::{Attribute, Header, Node, Relationship, ATR_PAD}; // import structs
 use crate::types::{AttributeBlock, Block, BlockType, NodeBlock, RelationshipBlock}; // import Block Types
-use crate::types::{EXPORT_PATH, PATH, RLT_PAD}; // import db PATH // import fixed static strings helper functions
+use crate::types::{EXPORT_PATH, PATH, RLT_PAD};
+use crate::{str_conversion, types}; // import db PATH // import fixed static strings helper functions
 
 // custom error macro
 macro_rules! custom_error {
@@ -151,7 +148,7 @@ pub fn print_node_name(offset: u64) -> Result<()> {
 
     // Decode bytes into Block struct
     let result_node = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
-    println!("-> {}", char_print(&result_node.node.name));
+    println!("-> {}", str_conversion::char_print(&result_node.node.name));
     Ok(())
 }
 
@@ -337,12 +334,26 @@ pub fn get_node(offset: u64) -> Result<Node> {
 
 pub fn get_relationship(offset: u64) -> Result<Relationship> {
     let mut stream = File::open(PATH)?;
-    stream.seek(SeekFrom::Start(offset))?;
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
+
+    stream.seek(SeekFrom::Start(offset))?;
     stream.read_to_end(&mut buffer)?;
+
     let relationship_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
 
     return Ok(relationship_block.relationship);
+}
+
+pub fn get_attribute(offset: u64) -> Result<Attribute> {
+    let mut stream = File::open(PATH)?;
+    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<AttributeBlock>());
+
+    stream.seek(SeekFrom::Start(offset))?;
+    stream.read_to_end(&mut buffer)?;
+
+    let attribute_block = map_bincode_error!(deserialize::<AttributeBlock>(&buffer))?;
+
+    return Ok(attribute_block.attribute);
 }
 
 pub fn get_block(offset: u64) -> Result<Block> {
@@ -563,14 +574,14 @@ pub fn get_node_address(node: &Node) -> Result<u64> {
     custom_error!("Not found, FATAL...");
 }
 
-pub fn get_node_address_from_name(name: String) -> Result<u64> {
+pub fn get_node_address_from_name(name: &String) -> Result<u64> {
     let mut stream = OpenOptions::new().read(true).open(PATH)?;
 
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
     stream.read_to_end(&mut buffer)?;
 
     let header = map_bincode_error!(deserialize::<Header>(&buffer))?;
-    let modified_string = str_to_fixed_chars(&name);
+    let modified_string = str_conversion::str_to_fixed_chars(&name);
 
     for i in 0..header.total_blocks {
         let offset = size_of::<Header>() as u64 + (i * size_of::<NodeBlock>() as u64);
@@ -605,7 +616,7 @@ pub fn get_relationship_address(relationship: &Relationship) -> Result<u64> {
     custom_error!("No Relationship Found, FATAL...");
 }
 //  Returns attributes address given an attribute
-pub fn get_relationship_from_to(name_from: String, name_to: String) -> Result<Relationship> {
+pub fn get_relationship_from_to(name_from: &String, name_to: &String) -> Result<Relationship> {
     let mut stream = OpenOptions::new().read(true).open(PATH)?;
 
     // let name_from = str_to_fixed_chars(&name_from);
@@ -621,13 +632,10 @@ pub fn get_relationship_from_to(name_from: String, name_to: String) -> Result<Re
         let block = get_block(offset)?;
 
         match block.block_type {
-            Node => {
-                // nah...
-            }
-
-            Relationship => {
-                let node_from_address = get_node_address_from_name(name_from)?;
-                let node_to_address = get_node_address_from_name(name_to)?;
+            // need to specify full path (types::BlockType::)...
+            types::BlockType::Relationship => {
+                let node_from_address = get_node_address_from_name(&name_from)?;
+                let node_to_address = get_node_address_from_name(&name_to)?;
 
                 let relationship = get_relationship(offset)?;
 
@@ -639,12 +647,7 @@ pub fn get_relationship_from_to(name_from: String, name_to: String) -> Result<Re
                 }
             }
             // nah...
-            Empty => {}
-            Unset => {}
-            Node => {}
-            Relationship => {}
-            Attribute => {}
-            Final => {}
+            _ => {}
         }
     }
 
@@ -652,11 +655,25 @@ pub fn get_relationship_from_to(name_from: String, name_to: String) -> Result<Re
     custom_error!("No Relationship Found, FATAL...");
 }
 
-// returns attributes address given an attributes content
-// fn u64 getAttributeAddressContent(char* content);
+pub fn get_attribute_address(attribute: &Attribute) -> Result<u64> {
+    let mut stream = OpenOptions::new().read(true).open(PATH)?;
 
-// returns attributes address given an attribute
-// fn u64 getAttributeAddress(Attribute attribute);
+    // read header
+    let mut buffer = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut buffer)?;
+    let header = map_bincode_error!(deserialize::<Header>(&buffer))?;
+
+    for i in 0..header.total_blocks {
+        let offset = size_of::<Header>() as u64 + (i * size_of::<RelationshipBlock>() as u64);
+        let current_attribute = get_attribute(offset)?;
+
+        if compare_attribute(&current_attribute, attribute) {
+            return Ok(offset);
+        }
+    }
+
+    custom_error!("No Relationship Found, FATAL...");
+}
 
 // traverse file and print each block
 pub fn print_all_nodes() -> Result<()> {
@@ -764,7 +781,7 @@ pub fn update_node_name(node_address: u64, new_node_name: String) -> Result<()> 
 
     let mut node_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
 
-    node_block.node.name = str_to_fixed_chars(&new_node_name);
+    node_block.node.name = str_conversion::str_to_fixed_chars(&new_node_name);
 
     let mut serialized_node_block = map_bincode_error!(serialize(&node_block))?;
 
@@ -895,7 +912,7 @@ pub fn delete_relationship(relationship: Relationship) -> Result<()> {
 pub fn delete_node_name(name: String) -> Result<()> {
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
-    let node_address = get_node_address_from_name(name)?;
+    let node_address = get_node_address_from_name(&name)?;
 
     // read node information
     let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());

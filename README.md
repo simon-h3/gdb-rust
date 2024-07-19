@@ -5,9 +5,9 @@
 - [x] Format Disk
 - [x] Expand Disk
 - [x] Print Headers
-- [ ] Node, Relationship, Attribute and Block Printers
-- [ ] Node, Relationship, Attribute comparisons.
-- [ ] Node, Relationship, Attribute 'getters'.
+- [x] Node, Relationship, Attribute and Block Printers
+- [x] Node, Relationship, Attribute comparisons.
+- [x] Node, Relationship, Attribute 'getters'.
 - [x] Create Node
 - [x] Create Relationship
 - [ ] Create Attribute

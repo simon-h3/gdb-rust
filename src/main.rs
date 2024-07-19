@@ -2,17 +2,17 @@
     Simon H - 2024
 */
 
-mod types;  // Import the types module
-mod disk;
-mod test;
-mod interface;
-mod fixed_static_str;
 mod api;
+mod disk;
+mod interface;
+mod str_conversion;
+mod test;
+mod types; // Import the types module
 
 const TITLE: &str = r#"
-            ___  ____   __   ____  _  _    ____   __  ____  __   ____   __   ____  ____ 
+            ___  ____   __   ____  _  _    ____   __  ____  __   ____   __   ____  ____
            / __)(  _ \ / _\ (  _ \/ )( \  (    \ / _\(_  _)/ _\ (  _ \ / _\ / ___)(  __)
-          ( (_ \ )   //    \ ) __/) __ (   ) D (/    \ )( /    \ ) _ (/    \\___ \ ) _) 
+          ( (_ \ )   //    \ ) __/) __ (   ) D (/    \ )( /    \ ) _ (/    \\___ \ ) _)
            \___/(__\_)\_/\_/(__)  \_)(_/  (____/\_/\_/(__)\_/\_/(____/\_/\_/(____/(____)
         "#;
 
