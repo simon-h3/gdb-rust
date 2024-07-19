@@ -2,14 +2,15 @@
     Simon H - 2024
 */
 
-use crate::disk::{create_node, create_relationship};
+use crate::node::*;
+use crate::relationship::*;
 use crate::types::{Node, Relationship};
 // Module: test
 #[cfg(test)]
 mod tests {
-    use crate::disk::{
-        create_node, create_relationship, format_disk, print_all_blocks, print_header,
-    };
+    use crate::disk::*;
+    use crate::node::*;
+    use crate::relationship::*;
     use crate::str_conversion;
     use crate::test::{test_nodes, test_relationships};
     use crate::types::{Node, Relationship};
