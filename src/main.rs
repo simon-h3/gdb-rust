@@ -3,8 +3,11 @@
 */
 
 mod api;
+mod attribute;
 mod disk;
 mod interface;
+mod node;
+mod relationship;
 mod str_conversion;
 mod test;
 mod types; // Import the types module
