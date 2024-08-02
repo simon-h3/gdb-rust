@@ -11,9 +11,9 @@
 - [x] Create Node
 - [x] Create Relationship
 - [x] Create Attribute
-- [ ] Delete Node
-- [ ] Delete Relationship
-- [ ] Delete Attribute
+- [x] Delete Node
+- [x] Delete Relationship
+- [x] Delete Attribute
 
 # PYTHON - GRAPH VISUALISATION
 - [x] JSON Export
