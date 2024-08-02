@@ -288,20 +288,14 @@ pub fn delete_relationship(relationship: Relationship) -> Result<()> {
     Ok(())
 }
 
-// traverse linked list of relations and delete along the tree...
 /*
-
-    Open
-
-    Seek to rlt_head
-
-    while rlt_address != 0
-        read
-
-        delete
-            set rlt_address to next
-
+    Delete specific relationship, without breaking the linked list chain
 */
+pub fn delete_relationship_recouple(relationship: Relationship) -> Result<()> {
+    Ok()
+}
+
+// traverse linked list of relations and delete along the tree...
 pub fn delete_relations(rlt_head: u64) -> Result<()> {
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
