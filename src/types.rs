@@ -6,7 +6,7 @@ pub const PATH: &str = "database/test_database.db"; // The path to the database
 pub const EXPORT_PATH: &str = "database/output.json"; // The path to the exported database
 pub const INPUT_PATH: &str = "database/input.txt"; // Input file path, for testing
 pub const RLT_PAD: usize = 7; // Relationship padding
-pub const ATR_PAD: usize = RLT_PAD; // Attribute padding
+pub const ATR_PAD: usize = 2; // Attribute padding
 
 use serde_derive::{Deserialize, Serialize};
 use std::mem::size_of;
@@ -102,10 +102,10 @@ pub struct RelationshipBlock {
     pub pad: [u64; RLT_PAD],
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[repr(C)]
 pub struct Attribute {
-    pub value: String,
+    pub value: [char; 16],
     pub attr_next: u64,
 }
 

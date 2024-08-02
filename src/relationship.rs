@@ -7,6 +7,7 @@ use crate::disk::*;
 use crate::node::*;
 
 use bincode::{deserialize, serialize};
+use libc::RTNLGRP_MCTP_IFADDR;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Result, Seek, SeekFrom, Write};
 use std::mem::size_of;
@@ -259,19 +260,65 @@ pub fn append_relationship(node_address: u64, rlt_offset: u64) -> Result<()> {
 pub fn delete_relationship(relationship: Relationship) -> Result<()> {
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
-    let relationship_address = get_relationship_address(&relationship)?;
+    let empty_block: NodeBlock = Default::default();
+    let empty_block_srl = map_bincode_error!(serialize(&empty_block))?; // serialise
 
-    // read node information
-    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
-    stream.read_to_end(&mut buffer)?;
-    let mut rlt_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+    let rlt_address = get_relationship_address(&relationship)?;
 
-    rlt_block.block_type = BlockType::Empty;
+    // read current header information
+    let mut header_buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut header_buffer)?;
+    let header = map_bincode_error!(deserialize::<Header>(&header_buffer))?;
 
-    // write node information
-    let serialized_rlt_block = map_bincode_error!(serialize(&rlt_block))?;
-    stream.seek(SeekFrom::Start(relationship_address))?;
-    stream.write_all(&serialized_rlt_block)?;
+    stream.seek(SeekFrom::Start(rlt_address))?;
+
+    // // read rlt_block
+    // let mut rlt_buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
+    // stream.read_to_end(&mut rlt_buffer)?;
+    // let rlt_block = map_bincode_error!(deserialize::<RelationshipBlock>(&rlt_buffer))?;
+
+    stream.seek(SeekFrom::Start(rlt_address))?;
+
+    stream.write_all(&empty_block_srl)?;
+
+    if header.first_empty > rlt_address {
+        new_first_empty()?;
+    }
+
+    Ok(())
+}
+
+// traverse linked list of relations and delete along the tree...
+/*
+
+    Open
+
+    Seek to rlt_head
+
+    while rlt_address != 0
+        read
+
+        delete
+            set rlt_address to next
+
+*/
+pub fn delete_relations(rlt_head: u64) -> Result<()> {
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    stream.seek(SeekFrom::Start(rlt_head))?;
+
+    let mut rlt_address = rlt_head;
+
+    while rlt_address > 0 {
+        // read rlt information
+        let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<RelationshipBlock>());
+        stream.read_to_end(&mut buffer)?;
+        let rlt_block = map_bincode_error!(deserialize::<RelationshipBlock>(&buffer))?;
+
+        delete_relationship(rlt_block.relationship)?;
+
+        rlt_address = rlt_block.relationship.rlt_next
+    }
 
     Ok(())
 }

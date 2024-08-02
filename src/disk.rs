@@ -8,7 +8,6 @@ use std::io::{Error, ErrorKind, Read, Result, Seek, SeekFrom, Write};
 use std::mem::size_of;
 use std::os::unix::fs::FileExt;
 
-
 // type imports can be combined, but this is easier to read
 use crate::types::Header; // import structs
 use crate::types::{AttributeBlock, Block, BlockType, NodeBlock, RelationshipBlock}; // import Block Types
@@ -279,6 +278,27 @@ pub fn get_first_empty(mut stream: &File, header: &Header) -> Result<u64> {
     }
     // block not found, preventative option to expand?
     custom_error!("Error in getting first empty");
+}
+
+// update first empty
+pub fn new_first_empty() -> Result<()> {
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    // read current header information
+    let mut header_buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut header_buffer)?;
+    let mut header = map_bincode_error!(deserialize::<Header>(&header_buffer))?;
+
+    let new_first_empty = get_first_empty(&stream, &header)?;
+
+    header.first_empty = new_first_empty;
+
+    // write new header information
+    stream.seek(SeekFrom::Start(0))?;
+    let serialized_header = map_bincode_error!(serialize(&header))?;
+    stream.write_all(&serialized_header)?;
+
+    Ok(())
 }
 
 // Debug function
