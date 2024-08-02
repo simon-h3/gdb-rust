@@ -12,9 +12,9 @@ use crate::disk::*;
 use crate::node::*;
 // use crate::relationship::*;
 
-use crate::types::PATH;
 use crate::types::{Attribute, Header, ATR_PAD}; // import structs
-use crate::types::{AttributeBlock, BlockType, RelationshipBlock}; // import Block Types
+use crate::types::{AttributeBlock, BlockType, RelationshipBlock};
+use crate::types::{NodeBlock, PATH}; // import Block Types
 
 // custom error macro
 macro_rules! custom_error {
@@ -134,6 +134,52 @@ pub fn append_attribute(node_address: u64, attribute_offset: u64) -> Result<()> 
         return Ok(());
     } else {
         append_attribute(attribute_block.attribute.attr_next, attribute_offset)?;
+    }
+
+    Ok(())
+}
+
+// Assigns attribute to EMPTY_BLOCK and writes to disk
+pub fn delete_attribute(attribute: Attribute) -> Result<()> {
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    let empty_block: NodeBlock = Default::default();
+    let empty_block_srl = map_bincode_error!(serialize(&empty_block))?; // serialise
+
+    let attr_address = get_attribute_address(&attribute)?;
+
+    // read current header information
+    let mut header_buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut header_buffer)?;
+    let header = map_bincode_error!(deserialize::<Header>(&header_buffer))?;
+
+    stream.seek(SeekFrom::Start(attr_address))?;
+    stream.write_all(&empty_block_srl)?;
+
+    if header.first_empty > attr_address {
+        new_first_empty()?;
+    }
+
+    Ok(())
+}
+
+// traverse linked list of attributes and delete along the tree
+pub fn delete_attributes(attr_head: u64) -> Result<()> {
+    let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
+
+    stream.seek(SeekFrom::Start(attr_head))?;
+
+    let mut attr_address = attr_head;
+
+    while attr_address > 0 {
+        // read attr information
+        let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<AttributeBlock>());
+        stream.read_to_end(&mut buffer)?;
+        let attr_block = map_bincode_error!(deserialize::<AttributeBlock>(&buffer))?;
+
+        delete_attribute(attr_block.attribute)?;
+
+        attr_address = attr_block.attribute.attr_next
     }
 
     Ok(())

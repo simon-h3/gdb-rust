@@ -291,23 +291,60 @@ pub fn delete_node_name(name: String) -> Result<()> {
 }
 
 //  Given a Node remove its record
-// TODO: test
+
+/*
+
+    Open Nodes File
+
+    Get node address (passed in function arg)
+
+    Seek to node address
+    read block into buffer
+    deserialise
+
+    set blocktype as BLOCKTYPE::EMPTY
+
+    seek back to node address
+
+    write blocktype
+
+    make call to delete_relations(node.rlt_head)
+        return Ok() if relations deleted.
+
+    update header with new first empty (potential check if different)...
+
+*/
+
 pub fn delete_node(node: Node) -> Result<()> {
     let mut stream = OpenOptions::new().read(true).write(true).open(PATH)?;
 
+    let empty_block: NodeBlock = Default::default();
+    let empty_block_srl = map_bincode_error!(serialize(&empty_block))?; // serialise
+
     let node_address = get_node_address(&node)?;
 
-    // read node information
-    let mut buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
-    stream.read_to_end(&mut buffer)?;
-    let mut node_block = map_bincode_error!(deserialize::<NodeBlock>(&buffer))?;
+    // read current buffer information
+    let mut header_buffer: Vec<u8> = Vec::with_capacity(size_of::<Header>());
+    stream.read_to_end(&mut header_buffer)?;
+    let mut header = map_bincode_error!(deserialize::<Header>(&header_buffer))?;
 
-    node_block.block_type = BlockType::Empty;
-
-    // write node information
-    let serialized_node_block = map_bincode_error!(serialize(&node_block))?;
     stream.seek(SeekFrom::Start(node_address))?;
-    stream.write_all(&serialized_node_block)?;
+
+    // read node_block
+    let mut node_buffer: Vec<u8> = Vec::with_capacity(size_of::<NodeBlock>());
+    stream.read_to_end(&mut node_buffer)?;
+    let mut node_block = map_bincode_error!(deserialize::<NodeBlock>(&node_buffer))?;
+
+    stream.seek(SeekFrom::Start(node_address))?;
+
+    stream.write_all(&empty_block_srl)?;
+
+    if header.first_empty > node_address {
+        new_first_empty()?;
+    }
+
+    delete_relations(node_block.node.rlt_head)?;
+    delete_attributes(node_block.node.attr_head)?;
 
     Ok(())
 }
