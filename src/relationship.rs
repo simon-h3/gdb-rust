@@ -7,7 +7,6 @@ use crate::disk::*;
 use crate::node::*;
 
 use bincode::{deserialize, serialize};
-use libc::RTNLGRP_MCTP_IFADDR;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Result, Seek, SeekFrom, Write};
 use std::mem::size_of;
@@ -292,7 +291,7 @@ pub fn delete_relationship(relationship: Relationship) -> Result<()> {
     Delete specific relationship, without breaking the linked list chain
 */
 pub fn delete_relationship_recouple(relationship: Relationship) -> Result<()> {
-    Ok()
+    Ok(())
 }
 
 // traverse linked list of relations and delete along the tree...
